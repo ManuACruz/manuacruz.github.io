@@ -118,7 +118,7 @@ h1 {
     align-items: center;
     justify-content: center;
     gap: 40px;
-    padding: 100px 10%;
+    padding: 80px 10%;
     max-width: 1200px;
     margin: auto;
 }
@@ -126,6 +126,7 @@ h1 {
 /* IMAGE CONTAINER */
 .image-container {
     flex: 1;
+    min-width: 300px; /* Prevents shrinking too much */
 }
 
 .image-container img {
@@ -137,20 +138,20 @@ h1 {
 /* TEXT CONTAINER */
 .text-container {
     flex: 1;
+    min-width: 300px; /* Prevents shrinking too much */
     text-align: left;
+    margin-left: 50px;
 }
 
 .text-container h2 {
     font-size: 2em;
     margin-bottom: 10px;
 }
-}
 
 .text-container p {
     font-size: 1.2em;
     color: #555;
     line-height: 1.6;
-    margin-left: 10px;
 }
 
 .text-container button {
@@ -174,19 +175,27 @@ h1 {
     flex-direction: row-reverse;
 }
 
+.reverse .text-container {
+    margin-left: 0; /* Remove unwanted margin */
+    margin-right: 50px; /* Shift text properly in reverse sections */
+}
+
 /* RESPONSIVE DESIGN */
 @media (max-width: 768px) {
     .section {
         flex-direction: column !important;
         text-align: center;
-        padding: 50px 30%;
+        padding: 50px 5%;
     }
     .reverse {
         flex-direction: column !important;
+    }
+    .text-container, .reverse .text-container {
+        margin: 0; /* Remove all margins on mobile */
         text-align: center;
-        padding: 50px 30%;
     }
 }
+
 
 /* FOOTER - Simple and Centered */
 footer {
