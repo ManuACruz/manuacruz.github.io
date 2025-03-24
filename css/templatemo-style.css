@@ -74,7 +74,7 @@ a.tm-text-light-dark:hover { color: #747474; }
 .tm-logo {
     width: 370px;
     height: 370px;
-    background: url(../img/backpack-guy.jpg) center no-repeat;
+    background: url(../img/profile.jpg) center no-repeat;
     background-size: cover;
     position: absolute;
     right: -13%;
