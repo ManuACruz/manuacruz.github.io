@@ -21,10 +21,11 @@ others mb: 40px;
 */
 
 body {
-  font-family: 'Open Sans', Helvetica, Arial, sans-serif;
-  font-size: 19px;
-  font-weight: 300;
-  color: #ffffff;
+  font-family: 'Century Gothic', 'Nunito', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-style: bold;
+  color: #cd7b29;
   overflow-x: hidden;
 }
 
@@ -40,7 +41,7 @@ body {
 .tm-gallery-container { max-width: 960px; }
 */
 
-h1 { font-size: 3.6rem; }
+h1 { font-size: 7rem;  font-weight: 900;}
 .tm-site-name { text-shadow: 3px 3px 4px #666; }
 a { transition: all 0.3s ease; }
 .tm-line-height-2 { line-height: 2; }
@@ -49,7 +50,7 @@ a { transition: all 0.3s ease; }
 a.tm-text-light-dark:hover { color: #747474; }
 
 .tm-top-bar {
-  background-color: #CC9999;
+  background-color: #cd7b29  ;
   max-width: 925px;
   width: 100%;
   height: 30px;
@@ -57,17 +58,23 @@ a.tm-text-light-dark:hover { color: #747474; }
 }
 
 .tm-bar-2 {
-  background-color: #CC9999;
+  background-color: #cd7b29;
   width: 100%;
   height: 15px;
   margin-top: 10px;
   margin-bottom: 40px;
 }
 
+.tm-bot-bar {
+  background-color: #cd7b29;
+  width: 100%;
+  height: 30px;
+}
+
 .tm-logo {
     width: 370px;
     height: 370px;
-    background: url(../img/logo-bg.png) center no-repeat;
+    background: url(../img/backpack-guy.jpg) center no-repeat;
     background-size: cover;
     position: absolute;
     right: -13%;
@@ -76,12 +83,13 @@ a.tm-text-light-dark:hover { color: #747474; }
     align-items: center;
     justify-content: center;
     z-index: 100;
+    clip-path: circle(50% at 50% 50%);
 }
 
 .tm-welcome { display: flex; }
 
 .tm-welcome-left {
-  background-color: #CEC0AE;
+  background-color: #ffe69c;
   padding: 80px;
   max-width: 925px;
   width: 84%;
@@ -98,28 +106,28 @@ a.tm-text-light-dark:hover { color: #747474; }
 }
 
 .tm-welcome-content { max-width: 490px; }
-.tm-font-big { font-size: 1.15rem; }
+.tm-font-big { font-size: 1.5rem;  font-weight: 700;}
 
 .tm-font-big a { color: #FF3; }
 
-.tm-font-normal { font-size: 1rem; }
+.tm-font-normal { font-size: 1.2rem; }
 
 .tm-welcome-icon {
   padding: 0 30px 60px;
   margin-left: 30px;
 }
 
-h2 { font-size: 2.3rem; }
+h2 { font-size: 2.5rem;  font-weight: 900;}
 
 p {
   line-height: 1.8;
-  font-size: 1rem;
+  font-size: 1.2rem;
 }
 
 .tm-welcome-link {
   text-decoration: underline;
   float: right;
-  color: white;
+  color: #297383;
   margin-top: 10px;
 }
 
@@ -130,15 +138,18 @@ p {
 }
 
 .tm-section-mb { margin-bottom: 40px; }
-.tm-section-pb { padding-bottom: 120px; }
-.tm-section-pt { padding-top: 135px; }
+.tm-section-pb { padding-bottom: 40px; }
 
 .tm-section-2-header {
   font-size: 2rem;
   margin-bottom: 40px;
 }
 
-.tm-section-2-inner,
+.tm-section-2-inner{
+  display: flex;
+  justify-content: flex-start;
+}
+
 .tm-section-3-inner {
   display: flex;
   justify-content: flex-end;
@@ -169,24 +180,8 @@ p {
   background-repeat: no-repeat;
 }
 
-.tm-img-container-1 {
-  background-image: url(../img/green-tree-red-cup.jpg);
-  background-position: top center;
-}
-
-.tm-img-container-2 {
-  background-image: url(../img/girl-01.jpg);
-  background-position: top center;
-  margin-left: 8px;
-}
-
-.tm-img-container-3 {
-  background-image: url(../img/backpack-guy.jpg);
-  background-position: top right;
-}
-
 .tm-img { width: 49%; }
-.tm-bg-primary { background-color: #CC9999; }
+.tm-bg-primary { background-color: #ffe69c; }
 .tm-bg-accent { background-color: #CEC0AE; }
 
 .tm-section-3-left {
@@ -206,6 +201,20 @@ p {
 }
 
 .tm-p-ml { margin-left: -35px; }
+
+.video-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+}
+
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
 
 .slick-dotted.slick-slider {
     margin-bottom: 15px;
@@ -417,7 +426,7 @@ figure.effect-lexi figcaption::before, figure.effect-lexi p {
 }
 
 @media (max-width: 1310px) {
-  .tm-bar-2 { max-width: 100%; }
+  .tm-bar-2, .tm-bot-bar { max-width: 100%; }
 }
 
 @media (max-width: 1199px) {
