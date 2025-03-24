@@ -155,8 +155,6 @@ p {
   justify-content: flex-end;
 }
 
-.tm-section-3 { min-height: 560px; }
-
 .tm-section-2-left {
   display: flex;
   width: 50%;
@@ -189,7 +187,6 @@ p {
   width: 50%;
   -webkit-clip-path: polygon(0 0, 86% 0, 100% 100%, 14% 100%);
   clip-path: polygon(0 0, 86% 0, 100% 100%, 14% 100%);
-  min-height: 560px;
 }
 
 .tm-section-3-right {
