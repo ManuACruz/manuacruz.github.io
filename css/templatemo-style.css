@@ -412,6 +412,18 @@ figure.effect-lexi figcaption::before, figure.effect-lexi p {
     transition: opacity 0.35s, transform 0.35s;
 }
 
+.logo-link {
+  float: right;
+  align-content: center;
+  width: 100px;
+  height: 100px;
+}
+
+.logo-link img {
+  width: 50%;
+}
+
+
 @media (min-width: 1430px) {
   .tm-contact-left { width: 80%; }
 
