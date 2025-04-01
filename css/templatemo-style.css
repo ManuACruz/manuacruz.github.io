@@ -1,25 +1,3 @@
-/*
-
-Beauty Template
-
-http://www.templatemo.com/tm-519-beauty
-
----------------------------------------
-
-COLORS
-primary: #CC9999;
-accent: #CEC0AE;
-accent dar: #786247;
-text dark: #333333;
-text light dark: #747474;
-
-header 1 mb: 25px;
-header 2 mb: 45px;
-header 3 mb: 35px;
-header 4 & 5 mb: 50px;
-others mb: 40px;
-*/
-
 body {
   font-family: 'Century Gothic', 'Nunito', sans-serif;
   font-size: 1.2rem;
@@ -41,7 +19,7 @@ body {
 .tm-gallery-container { max-width: 960px; }
 */
 
-h1 { font-size: 7rem;  font-weight: 900;}
+h1 { font-size: 9rem;  font-weight: 900;}
 .tm-site-name { text-shadow: 3px 3px 4px #666; }
 a { transition: all 0.3s ease; }
 .tm-line-height-2 { line-height: 2; }
@@ -49,36 +27,22 @@ a { transition: all 0.3s ease; }
 .tm-text-light-dark { color: #747474; }
 a.tm-text-light-dark:hover { color: #747474; }
 
-.tm-top-bar {
+.tm-bar {
   background-color: #cd7b29  ;
-  max-width: 925px;
+  max-width: 100%;
   width: 100%;
   height: 30px;
   margin-bottom: 10px;
 }
 
-.tm-bar-2 {
-  background-color: #cd7b29;
-  width: 100%;
-  height: 15px;
-  margin-top: 10px;
-  margin-bottom: 40px;
-}
-
-.tm-bot-bar {
-  background-color: #cd7b29;
-  width: 100%;
-  height: 30px;
-}
-
 .tm-logo {
-    width: 370px;
-    height: 370px;
+    width: 440px;
+    height: 440px;
     background: url(../img/profile.jpg) center no-repeat;
     background-size: cover;
     position: absolute;
-    right: -13%;
-    top: 18%;
+    right: -24%;
+    top: 8%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -89,23 +53,24 @@ a.tm-text-light-dark:hover { color: #747474; }
 .tm-welcome { display: flex; }
 
 .tm-welcome-left {
+  display: flex;
   background-color: #ffe69c;
-  padding: 80px;
-  max-width: 925px;
-  width: 84%;
+  padding: 80px 40px 20px 80px;
+  max-width: 80%;
+  width: 100%;
   position: relative;
 }
 
 .tm-welcome-right {
-  max-width: 205px;
-  width: 16%;
+  max-width: 20%;
+  width: 20%;
   -webkit-transform: skew(-10deg);
   transform: skew(-10deg);
   background: #ffffff;
-  margin-left: -52px;
+  margin-left: -70px;
 }
 
-.tm-welcome-content { max-width: 490px; }
+.tm-welcome-content { max-width: 80%; padding: 0; }
 .tm-font-big { font-size: 1.5rem;  font-weight: 700;}
 
 .tm-font-big a { color: #FF3; }
@@ -115,6 +80,18 @@ a.tm-text-light-dark:hover { color: #747474; }
 .tm-welcome-icon {
   padding: 0 30px 60px;
   margin-left: 30px;
+}
+
+.logo-link {
+  float: right;
+  align-content: center;
+  width: 100px;
+  height: 100px;
+  margin: auto;
+}
+
+.logo-link img {
+  width: 50%;
 }
 
 h2 { font-size: 2.5rem;  font-weight: 900;}
@@ -138,21 +115,18 @@ p {
 }
 
 .tm-section-mb { margin-bottom: 40px; }
-.tm-section-pb { padding-bottom: 40px; }
+.tm-section-pb { padding-bottom: 120px; }
+.tm-section-pt { padding-top: 135px; }
 
 .tm-section-2-header {
   font-size: 2rem;
   margin-bottom: 40px;
 }
 
-.tm-section-2-inner{
-  display: flex;
-  justify-content: flex-start;
-}
-
+.tm-section-2-inner,
 .tm-section-3-inner {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
 }
 
 .tm-section-3 { min-height: 560px; }
@@ -164,7 +138,6 @@ p {
   -webkit-clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
   clip-path: polygon(14% 0%, 100% 0%, 86% 100%, 0% 100%);
 }
-
 
 .tm-section-2-right {
   padding: 70px 120px 40px;
@@ -180,9 +153,27 @@ p {
   background-repeat: no-repeat;
 }
 
+.tm-img-container-1 {
+  background-image: url(../img/green-tree-red-cup.jpg);
+  background-position: top center;
+}
+
+.tm-img-container-2 {
+  background-image: url(../img/girl-01.jpg);
+  background-position: top center;
+  margin-left: 8px;
+}
+
+.tm-img-container-3 {
+  background-image: url(../img/backpack-guy.jpg);
+  background-position: top right;
+}
+
 .tm-img { width: 49%; }
 .tm-bg-primary { background-color: #ffe69c; }
 .tm-bg-accent { background-color: #CEC0AE; }
+
+.tm-section-3 { min-height: 560px; }
 
 .tm-section-3-left {
   padding: 70px 100px 80px 120px;
@@ -238,6 +229,7 @@ p {
 
 .slick-dots li button { width: 30px; }
 .slick-dots li { margin: 0 10px; }
+
 .tm-contact-left-col { min-height: 600px; }
 
 .tm-contact-left {
@@ -419,9 +411,7 @@ figure.effect-lexi figcaption::before, figure.effect-lexi p {
   .tm-contact-left { width: 80%; }
 
   .container {
-    max-width: 1430px;
-    padding-left: 120px;
-    padding-right: 120px;
+    max-width: 60%;
   }
 }
 
