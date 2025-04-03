@@ -8092,10 +8092,9 @@ input, select, textarea {
 		-moz-justify-content: center;
 		-webkit-justify-content: center;
 		-ms-justify-content: center;
-		justify-content: wrap;
+		justify-content: center;
 		margin: 10rem 12rem;
 		position: relative;
-		max-height: 100px;
 	}
 
 		.items.style3 > * {
