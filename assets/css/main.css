@@ -2640,6 +2640,52 @@ input, select, textarea {
 			border-radius: 4px;
 		}
 
+	/* ===== Videos: scoped to spotlights/banners only (DO NOT affect galleries) ===== */
+	.spotlight .image video,
+	.banner .image video,
+	.spotlight.style1 .image video,
+	.spotlight.style2 .image video,
+	.spotlight.style3 .image video,
+	.spotlight.style4 .image video,
+	.spotlight.style5 .image video,
+	.banner.style1 .image video,
+	.banner.style2 .image video {
+		-webkit-object-fit: cover;
+		object-fit: cover;
+		-webkit-object-position: center;
+		object-position: center;
+		display: block;
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		border-radius: 0;
+		transition: opacity 0.75s ease-in-out, transform 0.75s ease-in-out;
+	}
+
+	/* match onload/onscroll fade transitions used for images (scoped) */
+	.spotlight.onscroll-image-fade-right .image video,
+	.spotlight.onscroll-image-fade-in .image video,
+	.banner.onscroll-image-fade-right .image video,
+	.banner.onscroll-image-fade-in .image video,
+	.banner.onload-image-fade-right .image video,
+	.spotlight.onload-image-fade-right .image video {
+		transition: opacity 0.75s ease-in-out;
+		transition-delay: 0.5625s;
+	}
+
+	.spotlight.onscroll-image-fade-right.is-inactive .image video,
+	.spotlight.onscroll-image-fade-in.is-inactive .image video,
+	.banner.onscroll-image-fade-right.is-inactive .image video,
+	.banner.onscroll-image-fade-in.is-inactive .image video,
+	.banner.onload-image-fade-right.is-inactive .image video,
+	.spotlight.onload-image-fade-right.is-inactive .image video {
+		opacity: 0;
+		/* keep same movement so animations match image behaviour */
+		transform: translateX(-1rem);
+	}
+
 		.image.left, .image.right {
 			width: 40%;
 			max-width: 10rem;
@@ -8626,6 +8672,6 @@ input, select, textarea {
 			box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.125);
 		}
 
-			#wrapper.divided > .invert:first-child {
-				box-shadow: none !important;
-			}
+		#wrapper.divided > .invert:first-child {
+			box-shadow: none !important;
+		}
