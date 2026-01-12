@@ -5680,7 +5680,7 @@ input, select, textarea {
 				border-top-right-radius: 0;
 				border-bottom-right-radius: 0;
 			}
-
+		
 		.spotlight.style4.content-align-left {
 			text-align: left;
 		}
@@ -5703,6 +5703,15 @@ input, select, textarea {
 			object-position: right;
 		}
 
+		@media screen and (max-width: 736px) and (orientation: portrait) {
+			.spotlight.style4.orient-left,
+			.spotlight.style4.orient-right {
+				-moz-justify-content: -moz-flex-start;
+				-webkit-justify-content: -webkit-flex-start;
+				-ms-justify-content: -ms-flex-start;
+				justify-content: flex-start;
+			}
+		}
 		
 
 /* Spotlight (style5) */
