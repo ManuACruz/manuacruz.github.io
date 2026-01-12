@@ -2703,7 +2703,7 @@ input, select, textarea {
 
 		.image.right {
 			float: right;
-			margin: 0 0 1rem 1.5rem;
+			margin: 0 1.5rem 1rem 0;
 			top: 0.25rem;
 		}
 
