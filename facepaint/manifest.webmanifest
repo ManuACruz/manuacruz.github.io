@@ -1,0 +1,38 @@
+{
+  "name": "Face Paint",
+  "short_name": "Face Paint",
+  "description": "Little white creatures wander a tiny stage. Tap one and paint its face.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "any",
+  "background_color": "#f0f0f0",
+  "theme_color": "#f0f0f0",
+  "lang": "en",
+  "categories": [
+    "kids",
+    "games"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

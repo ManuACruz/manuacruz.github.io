@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f0f0f0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Face Paint" />
+    <meta name="description" content="Little white creatures wander a tiny stage. Tap one and paint its face." />
+    <title>Face Paint</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <script type="module" crossorigin src="./assets/index-CcJqrlxM.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-X1uehyhx.css">
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <!-- Start screen (GDD 3.1): the creatures are asleep; the first tap wakes
+         them, which is also the user gesture browsers need before audio. -->
+    <div id="wake" class="wake">
+      <div id="zzz" class="zzz" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5.5 5.8 Q12 4.6 18.2 5.4 L6.2 18.3 Q12.5 19.8 18.8 18.2" /></svg>
+        <svg viewBox="0 0 24 24"><path d="M5.2 6.2 Q11.5 4.2 18.6 5.8 L5.8 18 Q12 20.2 19 17.8" /></svg>
+        <svg viewBox="0 0 24 24"><path d="M6 5.4 Q12.4 5 18 6 L6.4 18.6 Q11.8 19.4 18.6 18.4" /></svg>
+      </div>
+    </div>
+    <!-- Scene 2 overlay: palette (left), tools (right), back (bottom). -->
+    <div id="paint-ui" hidden></div>
+  </body>
+</html>
