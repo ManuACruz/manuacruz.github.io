@@ -2,6 +2,7 @@
 html, body {
   margin: 0;
   height: 100%;
+  height: 100dvh;
   background: #0f1e25;
   color: #e3edf1;
   font-family: "Segoe UI", system-ui, sans-serif;
@@ -42,6 +43,8 @@ body {
   justify-content: center;
   background: rgba(15, 30, 37, 0.72);
   padding: calc(20 * var(--u));
+  padding-top: max(calc(20 * var(--u)), env(safe-area-inset-top));
+  padding-bottom: max(calc(20 * var(--u)), env(safe-area-inset-bottom));
 }
 .overlay.panel {
   top: 58%;
@@ -49,9 +52,26 @@ body {
   background: #16272f;
   border-top: calc(3 * var(--u)) solid #c97a2b;
   padding: calc(8 * var(--u)) calc(12 * var(--u));
+  padding-bottom: max(calc(8 * var(--u)), env(safe-area-inset-bottom));
   gap: calc(5 * var(--u));
   overflow-y: auto;
 }
+button.icon {
+  position: absolute;
+  top: calc(3 * var(--u));
+  right: calc(4 * var(--u));
+  width: calc(26 * var(--u));
+  height: calc(24 * var(--u));
+  margin: 0;
+  padding: 0;
+  font-size: calc(14 * var(--u));
+  line-height: 1;
+  background: transparent;
+  color: #fff;
+  border-radius: calc(6 * var(--u));
+  opacity: 0.85;
+}
+button.icon[hidden] { display: none; }
 
 .card {
   background: #16272f;

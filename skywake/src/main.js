@@ -1,4 +1,5 @@
 import { loadCSV } from './csv.js';
+import { sfx, unlock, isMuted, setMuted, vibrate } from './audio.js';
 
 // ---------- layout (logical pixels, portrait) ----------
 const W = 360, H = 640;
@@ -65,10 +66,11 @@ function moveToward(e, tx, ty, speed, dt) {
   e.x += (tx - e.x) / d * speed * dt; e.y += (ty - e.y) / d * speed * dt;
   return false;
 }
-function shipBob() { return Math.sin(clock * 1.6) * 3; }
+// Each column follows the one in front with a little lag, so the train sways instead of bobbing as a block.
+function bobAt(col) { return Math.sin(clock * 1.6 - col * 0.55) * 3; }
 function cellRect(col, row) {
   const x = GRID.x + col * (GRID.cell + GRID.gap);
-  const y = GRID.y + row * (GRID.cell + GRID.gap) + shipBob();
+  const y = GRID.y + row * (GRID.cell + GRID.gap) + bobAt(col);
   return { x, y, w: GRID.cell, h: GRID.cell, cx: x + GRID.cell / 2, cy: y + GRID.cell / 2 };
 }
 function cellAt(x, y) {
@@ -89,7 +91,20 @@ function carCenter(car) {
 }
 function carFaces(car) { return FACES[car.row][car.col]; }
 function onGrid(car) { return G.grid[car.row][car.col] === car; }
-function say(x, y, str, color = '#ffffff', big = false) { G.texts.push({ x, y, str, color, t: 0, big }); }
+function say(x, y, str, color = '#ffffff', big = false) {
+  let n = 0;
+  for (const t of G.texts) if (!t.big && t.t < 0.35 && Math.abs(t.x - x) < 16 && Math.abs(t.y - y) < 16) n++;
+  G.texts.push({ x: x + (n ? (n % 2 ? 10 : -10) : 0), y: y - n * 11, str, color, t: 0, big });
+}
+function sparks(x, y, n, color, speed = 120) {
+  for (let i = 0; i < n; i++) G.sparks.push({ x, y, vx: rand(-1, 1) * speed, vy: rand(-1, 0.3) * speed, t: 0, color, r: rand(1.5, 3) });
+  if (G.sparks.length > 160) G.sparks.splice(0, G.sparks.length - 160);
+}
+function bubble(car, emo) {
+  const b = G.bubbles.find((b) => b.car === car);
+  if (b) { b.emo = emo; b.t = 0; } else G.bubbles.push({ car, emo, t: 0 });
+}
+function banner(text, sub = '') { G.banner = { text, sub, t: 0 }; }
 function engine() { return G.grid[1][1]; }
 function legDef() { return DATA.legs[G.leg] || { name: `Leg ${G.leg}`, preview: '', enemy_hp_mult: 1, enemy_dmg_mult: 1, loot_mult: 1, boss: false }; }
 function legEnded() {
@@ -103,6 +118,8 @@ function newRun() {
     grid: [[null, null, null], [null, null, null], [null, null, null]],
     enemies: [], shots: [], loot: [], texts: [], pending: [], legRows: [], rowIdx: 0,
     calm: 0, lootTimer: 1, shake: 0,
+    slow: 0, speed: 1, scroll: 0, dark: 0, pier: { p: 0, leaving: false },
+    sparks: [], ripples: [], bubbles: [], reticle: null, banner: null,
     dock: { offers: [], placing: null, selected: null, moving: null },
     stats: { kills: 0, collected: 0, missed: 0, stolen: 0, rescued: 0, lost: 0 },
     legStats: null,
@@ -125,19 +142,38 @@ function startLeg(n) {
   G.legRows = DATA.waves.filter((w) => w.leg === n);
   G.rowIdx = 0;
   G.legStats = { kills: 0, caught: 0, missed: 0, stolen: 0, lost: 0, rescued: 0, engineStart: engine().hp, scrapStart: G.scrap };
+  if (G.pier.p >= 1) { G.pier.leaving = true; G.pier.p = 0; }
   mode = 'sail';
   showOverlay(null);
-  say(W / 2, 140, `Leg ${n}: ${legDef().name}`, '#ffffff', true);
+  banner(legDef().name, `Leg ${n} of ${LAST_LEG}`);
+  sfx.leg();
 }
 
 // ---------- update ----------
 function update(dt) {
   clock += dt;
   if (!G) return;
+  if (G.slow > 0) { G.slow -= dt; dt *= 0.3; }
   G.shake = Math.max(0, G.shake - dt * 3);
   for (const t of G.texts) t.t += dt;
   G.texts = G.texts.filter((t) => t.t < (t.big ? 1.8 : 0.9));
+  for (const s of G.sparks) { s.t += dt; s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 320 * dt; }
+  G.sparks = G.sparks.filter((s) => s.t < 0.45);
+  for (const r of G.ripples) r.t += dt;
+  G.ripples = G.ripples.filter((r) => r.t < 0.4);
+  for (const b of G.bubbles) b.t += dt;
+  G.bubbles = G.bubbles.filter((b) => b.t < 0.7 && onGrid(b.car));
+  if (G.banner && (G.banner.t += dt) > 2.2) G.banner = null;
+  if (G.reticle && (G.reticle.t += dt) > 0.3) G.reticle = null;
   for (const c of allCars()) { c.flash = Math.max(0, c.flash - dt); c.recoil = Math.max(0, c.recoil - dt * 4); }
+  // world motion: the train eases to a stop when the dock comes into view
+  const docked = mode === 'summary' || mode === 'dock' || (mode === 'sail' && legEnded() && G.leg < LAST_LEG);
+  G.speed += ((docked ? 0 : 1) - G.speed) * Math.min(1, dt * 2.5);
+  G.scroll += dt * G.speed;
+  const bossUp = G.enemies.some((e) => e.def.size >= 2 && !e.gone && !e.leaving);
+  G.dark += ((bossUp ? 1 : 0) - G.dark) * Math.min(1, dt * 1.5);
+  if (G.pier.leaving) { G.pier.p += dt * 1.4; if (G.pier.p > 1.6) { G.pier.p = 0; G.pier.leaving = false; } }
+  else if (mode === 'sail' && legEnded() && G.leg < LAST_LEG) G.pier.p = Math.min(1, G.pier.p + dt / S.leg_calm_s);
   if (mode !== 'sail') return;
 
   G.legTime += dt;
@@ -193,7 +229,7 @@ function update(dt) {
       l.vy += 420 * dt; l.y += l.vy * dt; l.x += l.vx * dt;
       if (l.y >= WATER_Y) { l.y = WATER_Y; l.floating = true; l.vx = l.drift; l.age = 0; }
     } else {
-      l.x += l.vx * dt;
+      l.x += l.vx * dt * Math.max(0.35, G.speed);
     }
   }
   for (const l of G.loot.filter((l) => l.x > W + 24)) {
@@ -225,12 +261,14 @@ function spawnEnemy(id) {
   G.enemies.push({
     def: d, hp, maxHp: hp, dmg: d.damage * L.enemy_dmg_mult, chargeDmg: d.charge_dmg * L.enemy_dmg_mult,
     x: -40, y: hy, hx, hy, slot, state: 'approach', cd: d.fire_rate * 0.8, held: 0, windT: 0, charged: 0,
-    target: null, carry: null, leaving: false, gone: false, seed: Math.random() * 7, flash: 0,
+    target: null, aim: null, carry: null, leaving: false, gone: false, seed: Math.random() * 7, flash: 0, kb: 0,
   });
+  if (d.size >= 2) { banner(d.name, 'boss'); sfx.boss(); vibrate([40, 60, 40, 60, 120]); }
 }
 
 function updateEnemy(e, dt) {
   e.flash = Math.max(0, e.flash - dt);
+  e.kb = Math.max(0, e.kb - dt * 5);
   const d = e.def;
   if (e.leaving) { e.x -= d.speed * 1.5 * dt; return; }
   switch (e.state) {
@@ -241,6 +279,8 @@ function updateEnemy(e, dt) {
       e.held += dt;
       if (d.stay_s > 0 && e.held >= d.stay_s) { e.leaving = true; say(e.x, e.y - 20 * d.size, `${d.name} leaves`, '#ffe0b3'); return; }
       e.cd -= dt;
+      // aim telegraph: pick the target early and show it before the shot
+      if (d.behavior === 'hold' && !e.aim && e.cd <= 0.45) e.aim = pickTargetCar(e);
       if (e.cd > 0) break;
       if (d.behavior === 'thief') {
         const l = nearestLoot(e);
@@ -250,7 +290,8 @@ function updateEnemy(e, dt) {
         if (car) { e.target = car; e.state = 'wind'; e.windT = 0; e.charged = 0; say(e.x, e.y - 20 * d.size, 'winding up!', '#ffb3a0'); }
         else e.cd = d.fire_rate;
       } else {
-        enemyFire(e);
+        enemyFire(e, e.aim && onGrid(e.aim) ? e.aim : pickTargetCar(e));
+        e.aim = null;
         e.cd = d.fire_rate * rand(0.8, 1.2);
       }
       break;
@@ -262,6 +303,7 @@ function updateEnemy(e, dt) {
         G.loot = G.loot.filter((x) => x !== l);
         e.carry = l; e.target = null; e.state = 'flee';
         say(e.x, e.y - 20, 'snatched!', '#ffb3a0');
+        sfx.snatch();
       }
       break;
     }
@@ -277,14 +319,14 @@ function updateEnemy(e, dt) {
       break;
     case 'wind':
       e.windT += dt;
-      if (e.charged >= d.charge_break) { e.state = 'return'; e.cd = d.fire_rate; say(e.x, e.y - 20 * d.size, 'interrupted!', '#ffffff', true); break; }
+      if (e.charged >= d.charge_break) { e.state = 'return'; e.cd = d.fire_rate; say(e.x, e.y - 20 * d.size, 'interrupted!', '#ffffff', true); sfx.interrupt(); sparks(e.x, e.y, 10, '#ffffff'); break; }
       if (e.windT >= S.charge_wind_s) e.state = 'dash';
       break;
     case 'dash': {
       const car = e.target;
       if (!car || !onGrid(car) || car.hp <= 0) { e.state = 'return'; break; }
       const c = carCenter(car);
-      if (moveToward(e, c.x - 34, c.y, 520, dt)) { hitCar(car, e.chargeDmg); G.shake = 1.5; e.state = 'return'; }
+      if (moveToward(e, c.x - 34, c.y, 520, dt)) { hitCar(car, e.chargeDmg); G.shake = 1.5; sfx.ram(); e.state = 'return'; }
       break;
     }
   }
@@ -319,8 +361,7 @@ function pickTargetCar(e) {
   }
   return null;
 }
-function enemyFire(e) {
-  const car = pickTargetCar(e);
+function enemyFire(e, car) {
   if (!car) return;
   const to = carCenter(car);
   G.shots.push({ x: e.x, y: e.y, tx: to.x, ty: to.y, t: 0, dur: dist(e.x, e.y, to.x, to.y) / S.projectile_speed, dmg: e.dmg, kind: 'car', ref: car, color: '#f0503c' });
@@ -340,6 +381,8 @@ function fireCar(car, e) {
   G.shots.push({ x: from.x, y: from.y, tx: e.x, ty: e.y, t: 0, dur: dist(from.x, from.y, e.x, e.y) / S.projectile_speed, dmg: car.def.damage, kind: 'enemy', ref: e, color: '#f2b843', big: car.def.damage >= 6 });
   car.cd = car.def.fire_rate;
   car.recoil = 1;
+  if (car.def.damage >= 6) sfx.fireHeavy(); else sfx.fireLight();
+  bubble(car, '😤');
 }
 
 function hitCar(car, dmg) {
@@ -348,16 +391,21 @@ function hitCar(car, dmg) {
   car.hp = Math.round((car.hp - dmg) * 10) / 10; car.flash = 0.25; G.shake = Math.max(G.shake, 1);
   const c = carCenter(car);
   say(c.x, c.y - 20, `-${dmg}`, '#ffb3a0');
-  if (car.hp <= 0) destroyCar(car);
+  sparks(c.x - 20, c.y, 7, '#f0503c', 90);
+  sfx.hitCar(); vibrate(30);
+  if (car.hp <= 0) destroyCar(car); else bubble(car, '😖');
 }
 function resolveShot(s) {
   if (s.kind === 'car') { hitCar(s.ref, s.dmg); return; }
   const e = s.ref;
   if (!G.enemies.includes(e) || e.gone) return;
   const dmg = Math.max(1, s.dmg - e.def.armor);
-  e.hp = Math.round((e.hp - dmg) * 10) / 10; e.flash = 0.2;
+  e.hp = Math.round((e.hp - dmg) * 10) / 10; e.flash = 0.2; e.kb = 1;
   if (e.state === 'wind') e.charged += dmg;
-  say(e.x, e.y - 22 * e.def.size, dmg < s.dmg ? `-${dmg} armor` : `-${dmg}`, dmg < s.dmg ? '#d9d2c4' : '#fff2c2');
+  const armored = dmg < s.dmg;
+  say(e.x, e.y - 22 * e.def.size, armored ? `-${dmg} armor` : `-${dmg}`, armored ? '#d9d2c4' : '#fff2c2');
+  sparks(e.x, e.y, armored ? 4 : 6, armored ? '#d9d2c4' : '#f2b843');
+  if (armored) sfx.armor(); else sfx.hitEnemy();
   if (e.hp <= 0) killEnemy(e);
 }
 
@@ -367,11 +415,16 @@ function destroyCar(car) {
   G.grid[car.row][car.col] = null;
   G.loot.push({ kind: 'car', car, emoji: car.def.emoji, value: 0, netOk: true, x: c.x, y: c.y, vx: rand(-20, 20), vy: -60, drift: S.cargo_drift, floating: false, age: 0, seed: Math.random() * 7 });
   say(c.x, c.y, `${car.def.emoji} overboard!`, '#ffb3a0', true);
+  sparks(c.x, c.y, 14, '#5a4030', 140);
+  G.slow = 0.35;
+  sfx.overboard(); vibrate([60, 40, 90]);
 }
 
 function killEnemy(e) {
   G.enemies = G.enemies.filter((x) => x !== e);
   G.stats.kills++; G.legStats.kills++;
+  sparks(e.x, e.y, e.def.size >= 2 ? 30 : 12, '#ffd08a', e.def.size >= 2 ? 220 : 150);
+  if (e.def.size >= 2) { sfx.bossDown(); G.slow = 0.35; G.shake = 2; vibrate([80, 40, 80, 40, 160]); } else sfx.kill();
   const value = Math.max(1, Math.round(e.def.cargo_value * legDef().loot_mult));
   for (let i = 0; i < e.def.cargo_count; i++) {
     G.loot.push({ kind: 'loot', emoji: '💰', value, netOk: true, x: e.x + rand(-14, 14), y: e.y, vx: rand(-25, 25), vy: rand(-140, -40), drift: S.cargo_drift, floating: false, age: 0, seed: Math.random() * 7 });
@@ -387,6 +440,8 @@ function collect(l, by) {
     G.scrap += l.value; G.stats.collected++; G.legStats.caught++;
     if (by === 'hand') G.hints.lootDone = true;
     say(l.x, l.y - 16, `+${l.value}`, by === 'hand' ? '#ffffff' : '#bfe6f5');
+    sparks(l.x, l.y, 5, '#bfe6f5', 70);
+    if (by === 'hand') sfx.grab(); else { sfx.net(); bubble(by, '😊'); }
   } else {
     const car = l.car;
     if (G.grid[car.row][car.col]) { G.stats.lost++; G.legStats.lost++; return; }
@@ -395,11 +450,16 @@ function collect(l, by) {
     car.flash = 0.4;
     G.stats.rescued++; G.legStats.rescued++;
     say(l.x, l.y - 16, `${car.def.emoji} rescued!`, '#ffffff', true);
+    sparks(l.x, l.y, 16, '#ffffff', 160);
+    sfx.rescue(); vibrate([30, 30, 30]);
+    bubble(car, '😅');
+    if (by !== 'hand') bubble(by, '💪');
   }
 }
 
 function endRun(win) {
   mode = 'end';
+  if (win) sfx.win(); else { sfx.gameOver(); vibrate([200, 80, 300]); }
   const st = G.stats;
   $('end').innerHTML = `
     <div class="card">
@@ -416,6 +476,7 @@ function endRun(win) {
 // ---------- leg summary ----------
 function endLeg() {
   mode = 'summary';
+  sfx.dock();
   const s = G.legStats;
   const hpLost = s.engineStart - engine().hp;
   const total = s.caught + s.missed + s.stolen;
@@ -560,6 +621,8 @@ function handleTap(x, y) {
   if (!G) return;
   if (mode === 'dock') { dockTap(x, y); return; }
   if (mode !== 'sail') return;
+  G.ripples.push({ x, y, t: 0 });
+  sfx.tap();
   // enemies first
   let hit = null, hd = Infinity;
   for (const e of G.enemies) {
@@ -569,6 +632,7 @@ function handleTap(x, y) {
   }
   if (hit) {
     G.hints.enemyDone = true;
+    G.reticle = { e: hit, t: 0 };
     let ready = 0;
     for (const car of allCars()) {
       if (car.def.auto || !canTarget(car, hit)) continue;
@@ -590,13 +654,27 @@ function handleTap(x, y) {
 
 canvas.addEventListener('pointerdown', (ev) => {
   ev.preventDefault();
+  unlock();
   const r = canvas.getBoundingClientRect();
   handleTap((ev.clientX - r.left) / r.width * W, (ev.clientY - r.top) / r.height * H);
 });
+// touch pointerdown is not a user activation for audio on every browser; retry on real gestures too
+stage.addEventListener('click', unlock);
+stage.addEventListener('touchend', unlock, { passive: true });
 
 function showOverlay(name) {
-  for (const id of ['title', 'dock', 'end', 'summary']) $(id).hidden = id !== name;
+  for (const id of ['title', 'dock', 'end', 'summary', 'pause']) $(id).hidden = id !== name;
 }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && mode === 'sail') { mode = 'paused'; showOverlay('pause'); }
+});
+$('resume').addEventListener('click', () => {
+  if (mode === 'paused') { mode = 'sail'; showOverlay(null); last = performance.now(); }
+});
+const muteBtn = $('mute');
+const paintMute = () => { muteBtn.textContent = isMuted() ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', isMuted() ? 'Unmute' : 'Mute'); };
+muteBtn.addEventListener('click', () => { setMuted(!isMuted()); paintMute(); });
+paintMute();
 
 // ---------- drawing ----------
 function draw() {
@@ -605,17 +683,21 @@ function draw() {
   drawSky();
   drawSea();
   if (G) {
+    drawPier();
     drawLoot();
     drawShip();
     drawEnemies();
     drawShots();
+    drawEffects();
     drawHints();
     drawTexts();
+    drawBanner();
     drawHUD();
   }
   ctx.restore();
 }
 
+const scroll = () => (G ? G.scroll : clock);
 function drawSky() {
   const g = ctx.createLinearGradient(0, 0, 0, WATER_Y);
   g.addColorStop(0, '#79c3e8'); g.addColorStop(1, '#dbeef7');
@@ -623,22 +705,40 @@ function drawSky() {
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   const clouds = [[0, 40, 26, 46], [140, 90, 20, 30], [260, 30, 30, 22], [80, 150, 18, 38], [300, 130, 22, 26]];
   for (const [bx, y, r, sp] of clouds) {
-    const x = ((bx + clock * sp) % (W + 160)) - 80;
+    const x = ((bx + scroll() * sp) % (W + 160)) - 80;
     ctx.beginPath(); ctx.ellipse(x, y, r * 1.8, r * 0.7, 0, 0, Math.PI * 2); ctx.ellipse(x + r, y - r * 0.4, r * 1.1, r * 0.7, 0, 0, Math.PI * 2); ctx.fill();
   }
+  if (G && G.dark > 0.01) { ctx.fillStyle = `rgba(40,30,70,${0.3 * G.dark})`; ctx.fillRect(0, 0, W, WATER_Y); }
 }
 function drawSea() {
+  const ph = scroll() * 3 + clock * 0.6;
   const g = ctx.createLinearGradient(0, WATER_Y - 10, 0, H);
   g.addColorStop(0, '#3e97bd'); g.addColorStop(1, '#173544');
   ctx.fillStyle = g;
   ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, WATER_Y);
-  for (let x = 0; x <= W; x += 8) ctx.lineTo(x, WATER_Y - 6 + Math.sin(x / 22 - clock * 3) * 4);
+  for (let x = 0; x <= W; x += 8) ctx.lineTo(x, WATER_Y - 6 + Math.sin(x / 22 - ph) * 4);
   ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+  if (G && G.dark > 0.01) { ctx.fillStyle = `rgba(5,15,40,${0.5 * G.dark})`; ctx.fillRect(0, WATER_Y - 12, W, H - WATER_Y + 12); }
   ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
   ctx.beginPath();
-  for (let x = 0; x <= W; x += 8) { const y = WATER_Y - 6 + Math.sin(x / 22 - clock * 3) * 4; if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  for (let x = 0; x <= W; x += 8) { const y = WATER_Y - 6 + Math.sin(x / 22 - ph) * 4; if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
   ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(0, WATER_Y - 4, W, 28);
+}
+function drawPier() {
+  const p = G.pier;
+  if (p.p <= 0) return;
+  const x = p.leaving ? p.p * 320 : -150 + 150 * p.p;
+  const top = WATER_Y - 18;
+  ctx.fillStyle = '#5a4030';
+  for (let i = 0; i < 4; i++) ctx.fillRect(x + 12 + i * 38, top, 6, 60);
+  ctx.fillStyle = '#8a6a48'; ctx.fillRect(x, top - 8, 150, 10);
+  ctx.fillStyle = '#6f5238'; for (let i = 0; i < 12; i++) ctx.fillRect(x + i * 12.5, top - 8, 1.5, 10);
+  ctx.fillStyle = '#5a4030'; ctx.fillRect(x + 122, top - 52, 5, 46);
+  ctx.fillStyle = '#e5c16a'; ctx.beginPath(); ctx.arc(x + 124.5, top - 56, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(229,193,106,0.25)'; ctx.beginPath(); ctx.arc(x + 124.5, top - 56, 16 + Math.sin(clock * 4) * 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3b2a18'; ctx.fillRect(x + 28, top - 40, 64, 20);
+  label(`DOCK ${Math.min(G.leg, LAST_LEG - 1)}`, x + 60, top - 30, 11, '#f3e2cf');
 }
 
 function emoji(str, x, y, size) {
@@ -705,10 +805,23 @@ function drawShip() {
     roundRect(x, y, k.w, k.h, 8); ctx.fill();
     if (faces.length === 2) { ctx.fillStyle = FACE_COLOR[faces[0] === main ? faces[1] : faces[0]]; ctx.globalAlpha = 0.5; roundRect(x, y, k.w, k.h / 2, 8); ctx.fill(); ctx.globalAlpha = 1; }
     if (car.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${car.flash * 2})`; roundRect(x, y, k.w, k.h, 8); ctx.fill(); }
+    // cracks when badly hurt
+    if (car.hp / car.def.hp < 0.35) {
+      ctx.strokeStyle = 'rgba(40,20,10,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath();
+      const s = car.seed;
+      ctx.moveTo(x + 8 + (s % 10), y + 4); ctx.lineTo(x + 22 + (s % 7), y + 18); ctx.lineTo(x + 14, y + 30);
+      ctx.moveTo(x + k.w - 10, y + k.h - 14); ctx.lineTo(x + k.w - 22 - (s % 6), y + k.h - 26); ctx.lineTo(x + k.w - 30, y + k.h - 18);
+      ctx.stroke();
+    }
     const selected = mode === 'dock' && (d.selected === car || d.moving === car);
     const swapTarget = mode === 'dock' && d.moving && d.moving !== car && car.def.id !== 'engine' && validCell(d.moving.def, c, r) && validCell(car.def, d.moving.col, d.moving.row);
     ctx.strokeStyle = selected ? '#ffffff' : swapTarget ? '#e5964a' : '#3b2a18'; ctx.lineWidth = selected || swapTarget ? 3 : 2;
     roundRect(x, y, k.w, k.h, 8); ctx.stroke();
+    // manual weapon ready and something to shoot: glow
+    if (mode === 'sail' && !car.def.auto && car.def.damage > 0 && car.cd <= 0 && G.enemies.some((en) => canTarget(car, en))) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.45 + 0.35 * Math.sin(clock * 7)})`; ctx.lineWidth = 4;
+      roundRect(x - 2, y - 2, k.w + 4, k.h + 4, 10); ctx.stroke();
+    }
     emoji(car.def.emoji, x + k.w / 2, y + k.h / 2 - 4, 26);
     hpBar(x + 6, y + k.h - 9, k.w - 12, car.hp, car.def.hp);
     if (car.def.tier > 1) label('I'.repeat(car.def.tier), x + k.w - 8, y + 9, 10, '#ffffff', 'right');
@@ -718,12 +831,17 @@ function drawShip() {
       ctx.beginPath(); ctx.arc(x + 9, y + 9, 5, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke();
     }
   }
-  // exhaust
+  // engine: propeller and exhaust
   const e = engine();
   if (e && e.hp > 0) {
     const c = carCenter(e);
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    for (let i = 0; i < 3; i++) { const t = (clock * 2 + i / 3) % 1; ctx.beginPath(); ctx.arc(c.x + 40 + t * 60, c.y + 20 - t * 8 + Math.sin(t * 9) * 3, 3 + t * 5, 0, Math.PI * 2); ctx.fill(); }
+    const px = c.x + 32, py = c.y + 6, a = G.scroll * 22;
+    ctx.fillStyle = '#3b2a18'; ctx.fillRect(px - 6, py - 3, 8, 6);
+    ctx.strokeStyle = '#8a6a48'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { const t = a + i * Math.PI * 2 / 3; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(t) * 2, py + Math.sin(t) * 9); ctx.stroke(); }
+    ctx.lineCap = 'butt';
+    ctx.fillStyle = `rgba(255,255,255,${0.2 + 0.3 * G.speed})`;
+    for (let i = 0; i < 3; i++) { const t = (G.scroll * 2 + i / 3) % 1; ctx.beginPath(); ctx.arc(c.x + 40 + t * 60 * (0.3 + 0.7 * G.speed), c.y + 20 - t * 8 + Math.sin(t * 9) * 3, 3 + t * 5, 0, Math.PI * 2); ctx.fill(); }
   }
 }
 
@@ -732,6 +850,18 @@ function drawEnemies() {
     if (e.gone) continue;
     const bob = e.state === 'dive' || e.state === 'flee' || e.state === 'dash' ? 0 : Math.sin(clock * 2.2 + e.seed) * 3;
     const size = 26 * e.def.size;
+    // aim telegraph: red pulse and a faint line to the car about to be hit
+    if (e.aim && onGrid(e.aim) && e.state === 'hold') {
+      const c = carCenter(e.aim);
+      ctx.strokeStyle = 'rgba(240,80,60,0.45)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(e.x, e.y + bob); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = `rgba(240,80,60,${0.2 + 0.2 * Math.sin(clock * 16)})`; ctx.beginPath(); ctx.arc(e.x, e.y + bob, size * 0.75, 0, Math.PI * 2); ctx.fill();
+    }
+    if (e.state === 'dive' && e.target) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 5]);
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.target.x, e.target.y - 10); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (e.kb > 0) { ctx.save(); ctx.translate(e.def.lane === 'sky' ? 0 : -6 * e.kb, e.def.lane === 'sky' ? -6 * e.kb : 0); }
     if (e.state === 'wind') {
       const p = e.windT / S.charge_wind_s;
       ctx.fillStyle = `rgba(240,80,60,${0.25 + 0.25 * Math.sin(clock * 14)})`; ctx.beginPath(); ctx.arc(e.x, e.y + bob, size * 0.8, 0, Math.PI * 2); ctx.fill();
@@ -745,7 +875,56 @@ function drawEnemies() {
     if (e.carry) emoji(e.carry.emoji, e.x + size * 0.4, e.y + bob + size * 0.45, 14);
     if (!e.leaving) hpBar(e.x - size * 0.6, e.y + bob - size * 0.75, size * 1.2, e.hp, e.maxHp, e.def.size >= 2 ? 6 : 4);
     if (e.def.armor > 0 && !e.leaving) label(`🛡${e.def.armor}`, e.x + size * 0.6, e.y + bob - size * 0.75 - 7, 9, '#ffffff', 'right');
+    if (e.kb > 0) ctx.restore();
   }
+}
+function drawEffects() {
+  for (const s of G.sparks) {
+    ctx.globalAlpha = 1 - s.t / 0.45; ctx.fillStyle = s.color;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for (const r of G.ripples) {
+    const p = r.t / 0.4;
+    ctx.strokeStyle = `rgba(255,255,255,${0.7 * (1 - p)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 6 + p * 40, 0, Math.PI * 2); ctx.stroke();
+  }
+  const rt = G.reticle;
+  if (rt && G.enemies.includes(rt.e)) {
+    const e = rt.e, s = 16 * e.def.size + 8 - rt.t * 20, x = e.x, y = e.y, g = 6;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - s, y - s + g); ctx.lineTo(x - s, y - s); ctx.lineTo(x - s + g, y - s);
+    ctx.moveTo(x + s - g, y - s); ctx.lineTo(x + s, y - s); ctx.lineTo(x + s, y - s + g);
+    ctx.moveTo(x + s, y + s - g); ctx.lineTo(x + s, y + s); ctx.lineTo(x + s - g, y + s);
+    ctx.moveTo(x - s + g, y + s); ctx.lineTo(x - s, y + s); ctx.lineTo(x - s, y + s - g);
+    ctx.stroke();
+  }
+  for (const b of G.bubbles) {
+    const c = carCenter(b.car);
+    const pop = Math.min(1, b.t / 0.1);
+    const fade = b.t > 0.5 ? 1 - (b.t - 0.5) / 0.2 : 1;
+    ctx.globalAlpha = fade;
+    const bx = c.x + 16, by = c.y - 30 - (b.t * 6);
+    ctx.fillStyle = '#ffffff';
+    roundRect(bx - 11 * pop, by - 9 * pop, 22 * pop, 18 * pop, 6 * pop); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(bx - 4 * pop, by + 8 * pop); ctx.lineTo(bx - 8 * pop, by + 13 * pop); ctx.lineTo(bx + 1 * pop, by + 8 * pop); ctx.fill();
+    if (pop >= 1) emoji(b.emo, bx, by, 12);
+    ctx.globalAlpha = 1;
+  }
+}
+function drawBanner() {
+  const b = G.banner;
+  if (!b) return;
+  const a = b.t < 0.3 ? b.t / 0.3 : b.t > 1.7 ? Math.max(0, (2.2 - b.t) / 0.5) : 1;
+  ctx.globalAlpha = a;
+  const y = 120;
+  ctx.fillStyle = 'rgba(15,30,37,0.75)'; ctx.fillRect(0, y - 30, W, 60);
+  ctx.fillStyle = b.sub === 'boss' ? '#f0503c' : '#e5964a'; ctx.fillRect(0, y - 30, W, 2); ctx.fillRect(0, y + 28, W, 2);
+  ctx.font = '800 24px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff'; ctx.fillText(b.text.toUpperCase(), W / 2, y - 4);
+  if (b.sub) { ctx.font = '600 11px Consolas, "IBM Plex Mono", monospace'; ctx.fillStyle = b.sub === 'boss' ? '#ffb3a0' : '#ffd08a'; ctx.fillText(b.sub.toUpperCase(), W / 2, y + 16); }
+  ctx.globalAlpha = 1;
 }
 function drawShots() {
   for (const s of G.shots) {
@@ -764,8 +943,10 @@ function drawLoot() {
       ctx.strokeStyle = '#f0503c'; ctx.lineWidth = 3; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.arc(l.x, l.y + bob, 15, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
       emoji(l.emoji, l.x, l.y + bob, 20);
     } else {
+      if (l.floating && l.x > W - 56) ctx.globalAlpha = 0.35 + 0.65 * Math.abs(Math.sin(clock * 9));
       emoji(l.emoji, l.x, l.y + bob + (l.floating ? 4 : 0), 20);
       if (!l.netOk && l.floating) label('✋', l.x + 12, l.y + bob - 8, 10);
+      ctx.globalAlpha = 1;
     }
   }
 }
@@ -808,7 +989,7 @@ function drawHUD() {
     x += 14;
   }
   ctx.font = '600 12px Consolas, "IBM Plex Mono", monospace'; ctx.textBaseline = 'middle';
-  ctx.textAlign = 'right'; ctx.fillStyle = '#ffd08a'; ctx.fillText(`⚙ ${G.scrap}`, W - 10, 15);
+  ctx.textAlign = 'right'; ctx.fillStyle = '#ffd08a'; ctx.fillText(`⚙ ${G.scrap}`, W - 34, 15);
   ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.fillText('ENGINE', W / 2 - 24, 15);
   const e = engine();
   hpBar(W / 2 + 4, 11, 80, e.hp, e.def.hp, 8);
@@ -861,7 +1042,11 @@ window.SKY = {
 loadData().then(() => {
   mode = 'title';
   $('loadmsg').textContent = `${Object.keys(DATA.cars).length} cars · ${Object.keys(DATA.enemies).length} enemies · ${DATA.waves.length} wave rows · ${LAST_LEG} legs`;
-  $('start').addEventListener('click', newRun);
+  $('start').addEventListener('click', () => {
+    unlock();
+    try { document.documentElement.requestFullscreen?.({ navigationUI: 'hide' })?.catch(() => {}); } catch (e) { /* not supported */ }
+    newRun();
+  });
   requestAnimationFrame(frame);
 }).catch((err) => {
   $('loadmsg').textContent = `Could not load data: ${err.message}. Serve the folder over http, not file://.`;

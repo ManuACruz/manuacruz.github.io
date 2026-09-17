@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#79c3e8"/>
+  <rect y="92" width="128" height="36" fill="#2e7fa3"/>
+  <path d="M0 96 Q16 88 32 96 T64 96 T96 96 T128 96 V128 H0 Z" fill="#3e97bd"/>
+  <g stroke="#3b2a18" stroke-width="3">
+    <rect x="22" y="22" width="24" height="24" rx="6" fill="#d9a066"/>
+    <rect x="52" y="22" width="24" height="24" rx="6" fill="#cfe3ee"/>
+    <rect x="22" y="52" width="24" height="24" rx="6" fill="#d9a066"/>
+    <rect x="52" y="52" width="24" height="24" rx="6" fill="#f0c75e"/>
+    <rect x="82" y="52" width="24" height="24" rx="6" fill="#c9c2b4"/>
+    <rect x="52" y="82" width="24" height="24" rx="6" fill="#7fb8d0"/>
+  </g>
+  <g stroke="#5a4030" stroke-width="3" stroke-dasharray="4 3">
+    <line x1="46" y1="34" x2="52" y2="34"/><line x1="34" y1="46" x2="34" y2="52"/>
+    <line x1="46" y1="64" x2="52" y2="64"/><line x1="76" y1="64" x2="82" y2="64"/>
+    <line x1="64" y1="46" x2="64" y2="52"/><line x1="64" y1="76" x2="64" y2="82"/>
+  </g>
+</svg>

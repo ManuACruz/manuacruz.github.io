@@ -1,0 +1,14 @@
+{
+  "name": "Skywake",
+  "short_name": "Skywake",
+  "description": "A rickety train of flying ships, crewed by animals, hunting sea monsters.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0f1e25",
+  "theme_color": "#0f1e25",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -45,6 +45,13 @@ Lines starting with `#` are comments. `yes`/`no` become booleans, numbers become
 - A destroyed car falls into the same lane. Grab it or net it to get it back, damaged. Miss it and it is gone.
 - Each leg ends with a summary, then a dock: cars repair (except the engine), three tier-1 cars are offered, and a placed car can be upgraded to its next tier, moved or sold. Re-rolling the offers costs scrap. The dock shows a forecast of the next leg.
 
+## Feel
+
+- Sounds are synthesised in `src/audio.js` with WebAudio, no asset files. The speaker icon in the top-right mutes them and remembers the choice.
+- Android phones vibrate on hits, overboard and rescue. iPhones ignore it.
+- Enemies show a red line to the car they are about to hit. Rams show a wind-up bar. Thieves show a dotted line to the loot they are diving for.
+- Add the page to the home screen for a fullscreen, portrait-locked app. The game pauses when you switch apps.
+
 ## Test hooks
 
 Open the browser console:
