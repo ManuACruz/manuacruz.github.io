@@ -1,0 +1,31 @@
+key,value
+# scrap the player starts a run with
+starting_scrap,20
+# seconds between natural flotsam spawns (randomised 0.7x to 1.3x)
+loot_interval_s,2.4
+# how close a tap must be to loot on the water to grab it (logical px)
+tap_radius,34
+# extra tap tolerance around enemies
+enemy_tap_radius,26
+# speed of every projectile (logical px per second)
+projectile_speed,420
+# drift speed of cargo dropped by enemies
+cargo_drift,55
+# rescued cars come back with this share of their max HP
+rescue_hp_pct,0.35
+# how many cars the dock offers
+dock_offers,3
+# car id that dock 1 always offers (blank for none)
+dock1_guaranteed,turret
+# selling a car refunds this share of its cost
+sell_pct,0.5
+# scrap it costs to re-roll the dock offers
+reroll_cost,10
+# quiet seconds after the last enemy of a leg before docking
+leg_calm_s,2.5
+# how far (px) from its perch a thief will dive for loot
+thief_reach,220
+# seconds a charger winds up before ramming
+charge_wind_s,1.5
+# show first-leg hints
+hints,yes

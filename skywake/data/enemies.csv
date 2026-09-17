@@ -1,0 +1,16 @@
+id,name,emoji,lane,behavior,hp,armor,speed,damage,fire_rate,stay_s,target_rows,target_cols,charge_dmg,charge_break,cargo_count,cargo_value,size
+# lane: front (arrives at ship height) or sky (arrives above).
+# behavior: hold = sits and shoots. thief = dives for floating loot and flies off with it, drops it if killed. charger = winds up then rams the front car of one of its rows.
+# armor: flat damage taken off every hit (a hit always does at least 1).
+# target_rows: rows a front enemy may hit (0 top, 2 bottom), separated by |. It hits the leftmost car in that row.
+# target_cols: columns a sky enemy may hit (0 front, 2 rear). It hits the topmost car in that column.
+# charge_dmg: damage of a ram. charge_break: damage you must deal during the wind-up to interrupt it.
+# stay_s: seconds before it leaves with its cargo. 0 = never leaves (bosses).
+gull,Gull,🐦,sky,hold,3,0,90,1,2.6,12,,0|1,0,0,1,3,1
+skiff,Skiff,⛵,front,hold,6,0,70,2,2.2,16,2,,0,0,2,4,1
+balloon,Balloon,🎈,sky,hold,10,0,50,2,2.4,18,,0,0,0,2,5,1.3
+gunboat,Gunboat,🚤,front,hold,16,1,60,3,1.7,22,1|2,,0,0,3,6,1.4
+frigatebird,Frigatebird,🦅,sky,thief,5,0,110,0,3,16,,,0,0,1,4,1.1
+ram,Ram,🐗,front,charger,14,1,80,0,4,24,1|2,,8,6,3,7,1.3
+kraken,Kraken,🐙,front,hold,90,3,35,4,1.3,0,0|1|2,,0,0,8,10,2.6
+leviathan,Leviathan,🐋,front,hold,180,4,30,5,1.1,0,0|1|2,,0,0,12,12,3.2

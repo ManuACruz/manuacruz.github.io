@@ -1,0 +1,405 @@
+<title>Skywake Concept</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #EEF3F5;
+    --panel: #E2EAEE;
+    --ink: #16303A;
+    --ink-soft: #3E5A66;
+    --muted: #6B8390;
+    --line: #CBD9E0;
+    --water: #2E7FA3;
+    --water-soft: #D3E6EF;
+    --brass: #C97A2B;
+    --brass-soft: #F3E2CF;
+    --sky-soft: #DCE9F0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0F1E25;
+      --panel: #16272F;
+      --ink: #E3EDF1;
+      --ink-soft: #B7C9D1;
+      --muted: #8FA6B1;
+      --line: #27404A;
+      --water: #5FB3D6;
+      --water-soft: #173544;
+      --brass: #E5964A;
+      --brass-soft: #3B2A18;
+      --sky-soft: #1A2E38;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0F1E25;
+    --panel: #16272F;
+    --ink: #E3EDF1;
+    --ink-soft: #B7C9D1;
+    --muted: #8FA6B1;
+    --line: #27404A;
+    --water: #5FB3D6;
+    --water-soft: #173544;
+    --brass: #E5964A;
+    --brass-soft: #3B2A18;
+    --sky-soft: #1A2E38;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 15.5px;
+    line-height: 1.55;
+    margin: 0;
+  }
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 24px 64px;
+  }
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.1;
+  }
+  h1 { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; }
+  h2 { font-size: 21px; font-weight: 700; margin-top: 36px; margin-bottom: 10px; }
+  h3 { font-size: 15.5px; font-weight: 700; }
+  p { margin: 0 0 10px; max-width: 66ch; }
+  strong { font-weight: 600; }
+
+  .eyebrow, .label {
+    font-family: "IBM Plex Mono", "Consolas", monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  header { padding-bottom: 20px; border-bottom: 2px solid var(--ink); }
+  header .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 14px; }
+  header .pitch {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    margin-top: 12px;
+    max-width: 30ch;
+  }
+  .titles { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .titles span { color: var(--ink-soft); }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0 24px;
+    margin-top: 20px;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 12px 0;
+  }
+  .facts div { padding: 4px 0; }
+  .facts .label { display: block; margin-bottom: 2px; }
+  .facts b { font-weight: 600; }
+
+  ul { padding-left: 18px; margin: 0 0 10px; max-width: 66ch; }
+  li { margin-bottom: 5px; }
+  li strong { font-weight: 600; }
+
+  /* --- Ship diagram --- */
+  .ship {
+    margin: 18px 0 6px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .lane {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .lane.sky { background: var(--sky-soft); }
+  .lane.water { background: var(--water-soft); color: var(--water); border-top: 1px dashed var(--line); }
+  .lane .arrow { color: var(--brass); font-weight: 500; white-space: nowrap; }
+
+  .deck {
+    display: grid;
+    grid-template-columns: 56px 1fr 56px;
+    align-items: stretch;
+  }
+  .side {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 0;
+  }
+  .side.front { color: var(--brass); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 14px 6px;
+  }
+  .cell {
+    aspect-ratio: 1.15;
+    border: 1.5px solid var(--line);
+    border-radius: 4px;
+    background: var(--ground);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 8px 9px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    line-height: 1.3;
+    min-width: 0;
+  }
+  .cell .face { color: var(--ink); font-weight: 500; }
+  .cell .ex { color: var(--muted); font-size: 11px; }
+  .cell.front { border-color: var(--brass); }
+  .cell.water { background: var(--water-soft); }
+  .cell.core { border-style: dashed; }
+  .cell.core .face { color: var(--brass); }
+  @media (max-width: 480px) {
+    .deck { grid-template-columns: 36px 1fr 36px; }
+    .cell { font-size: 11px; padding: 6px 7px; }
+    .cell .ex { font-size: 10px; }
+  }
+
+  .caption { font-size: 13.5px; color: var(--muted); margin-bottom: 8px; max-width: 66ch; }
+
+  /* --- Loop --- */
+  .loop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    margin: 14px 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .loop .step {
+    flex: 1 1 140px;
+    padding: 12px 14px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: -1px;
+    min-width: 0;
+  }
+  .loop .step .n {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--brass);
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .loop .step h3 { font-size: 14.5px; margin-bottom: 4px; }
+  .loop .step p { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
+  .loop .step.wet { background: var(--water-soft); }
+
+  /* --- Two column sections --- */
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px 32px;
+    margin-top: 16px;
+  }
+  @media (max-width: 620px) { .cols { grid-template-columns: 1fr; } }
+
+  /* --- Decisions table --- */
+  .tablewrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 6px;
+  }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); }
+  th { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  td:first-child { font-weight: 600; width: 34%; }
+  .tag {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag.set { background: var(--brass-soft); color: var(--brass); }
+  .tag.open { border: 1px solid var(--line); color: var(--muted); }
+
+  table.csv td:first-child { font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: 13px; width: 18%; }
+  table.csv td:nth-child(2) { width: 22%; }
+
+  .scope {
+    background: var(--panel);
+    border-left: 3px solid var(--brass);
+    padding: 14px 18px;
+    margin-top: 8px;
+  }
+  .scope ul { margin-bottom: 0; }
+
+  footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+</style>
+
+<div class="page">
+  <header>
+    <div class="meta">
+      <span class="eyebrow">Concept doc · v0.7</span>
+      <span class="eyebrow">2026-09-17</span>
+      <span class="eyebrow">Status: prototype 1, pass 1 (strategy)</span>
+    </div>
+    <h1>Skywake</h1>
+    <div class="titles">Name chosen for now. Earlier alternates: <span>Flotsam</span>, <span>Caravan</span>.</div>
+    <p class="pitch">A rickety train of flying ships, crewed by animals, hunting sea monsters and fishing their cargo out of the water.</p>
+    <div class="facts">
+      <div><span class="label">Genre</span><b>Roguelike auto-runner</b></div>
+      <div><span class="label">Platform</span><b>Mobile web, portrait</b></div>
+      <div><span class="label">Input</span><b>One thumb, tap only</b></div>
+      <div><span class="label">Look</span><b>Cute animals, simple, readable</b></div>
+    </div>
+  </header>
+
+  <h2>Where the fun is</h2>
+  <div class="cols">
+    <div>
+      <h3>While sailing: where does the thumb go</h3>
+      <p>Every tap spent grabbing loot is a tap not spent shooting, and the other way round. The wave design has to keep that choice alive, not let one side win by default.</p>
+    </div>
+    <div>
+      <h3>At the dock: upgrade wisely</h3>
+      <p>Money is short and slots are fewer. Picking the car and the cell that keeps the run going, instead of the one that looks strongest, is the build game.</p>
+    </div>
+  </div>
+  <p class="caption">If the first prototype proves these two, the rest is content. If it does not, nothing else matters yet.</p>
+
+  <h2>The ship</h2>
+  <p>The ship is a chain of up to nine cars on a 3×3 grid. Each car is one module plus the animal who lives in it. The ship flies left, always. Where a car sits decides what it can face, so placement is the build decision.</p>
+
+  <div class="ship">
+    <div class="lane sky"><span>Sky · air enemies, sails</span><span class="arrow">◀ ship travels left</span></div>
+    <div class="deck">
+      <div class="side front">Front · enemies</div>
+      <div class="grid">
+        <div class="cell front"><span class="face">Front + Sky</span><span class="ex">flak, harpoon</span></div>
+        <div class="cell"><span class="face">Sky</span><span class="ex">sail, lookout</span></div>
+        <div class="cell"><span class="face">Sky + Rear</span><span class="ex">lookout, balloon</span></div>
+        <div class="cell front"><span class="face">Front</span><span class="ex">cannon, armor</span></div>
+        <div class="cell core"><span class="face">Core</span><span class="ex">engine or command</span></div>
+        <div class="cell"><span class="face">Rear</span><span class="ex">storage, workshop</span></div>
+        <div class="cell front water"><span class="face">Front + Water</span><span class="ex">harpoon, hook</span></div>
+        <div class="cell water"><span class="face">Water</span><span class="ex">net, crane</span></div>
+        <div class="cell water"><span class="face">Water + Rear</span><span class="ex">trawl net</span></div>
+      </div>
+      <div class="side">Rear · no enemies</div>
+    </div>
+    <div class="lane water"><span>Water lane · loot, cargo drops, fallen cars</span><span class="arrow">drifts right ▶</span></div>
+  </div>
+  <p class="caption">Corner cells face two directions and are the premium spots. The center cell faces nothing and always holds the engine or command car. If that car is destroyed, the run ends. Everything else is replaceable.</p>
+
+  <div class="cols">
+    <div>
+      <h3>Cars</h3>
+      <p>Each car has its own HP and repairs at docks. A destroyed car falls into the water lane. The car behind it is now exposed and takes hits until the next dock. The chain never breaks. The center car never repairs: its HP is the run's true health bar.</p>
+    </div>
+    <div>
+      <h3>Animals</h3>
+      <p>An animal is welded to its car: one passive, one preferred facing, a few reaction lines. The module is the mechanic, the animal is the reason you care. Cars leveling up and gaining skills is planned, but not for the first prototype.</p>
+    </div>
+  </div>
+
+  <h2>One verb</h2>
+  <p>Tap loot to grab it by hand. Tap an enemy to fire every manual weapon at it. Collectors and auto-turrets work on their own. Nothing is dragged, aimed, or held.</p>
+  <p>Early on the thumb is split between loot and enemies. A good net on the water row is the upgrade that gives the thumb back. That is the power curve, and it needs no tutorial.</p>
+
+  <h2>The loop</h2>
+  <div class="loop">
+    <div class="step"><div class="n">1</div><h3>Enemies arrive</h3><p>From the front, sometimes above. Small fry and huge ones.</p></div>
+    <div class="step"><div class="n">2</div><h3>Kill drops cargo</h3><p>Everything an enemy carried falls into the water.</p></div>
+    <div class="step wet"><div class="n">3</div><h3>Cargo drifts under you</h3><p>Same lane as natural flotsam and your own fallen cars.</p></div>
+    <div class="step wet"><div class="n">4</div><h3>Catch it or lose it</h3><p>Nets grab it. A tap grabs it. Miss it and it is gone.</p></div>
+    <div class="step"><div class="n">5</div><h3>Dock and build</h3><p>Spend it on cars, rearrange the grid, recruit animals.</p></div>
+  </div>
+  <p>A fallen car uses the same lane. Catch it and the animal comes back damaged. Miss it and the animal is gone for the run. Combat feeds the water lane twice, so watching the water is never optional.</p>
+
+  <h2>Run structure</h2>
+  <ul>
+    <li><strong>Legs.</strong> Continuous scrolling between docks. No branching map. All choices happen at the dock, because sailing is already busy.</li>
+    <li><strong>Docks.</strong> Shop, rearrange, recruit, repair everything except the center car, and one event card.</li>
+    <li><strong>Bosses.</strong> Every third dock. A boss fills the whole left side of the screen.</li>
+    <li><strong>Biomes.</strong> Calm sea has more flotsam, fewer enemies. Storm sea reverses it. Ice sea slows loot so nets matter more.</li>
+    <li><strong>Progression.</strong> In-run through cars and placement. Meta through unlocked animals and cars.</li>
+  </ul>
+
+  <h2>Balancing</h2>
+  <p>Enemy waves and difficulty curve are the hard part, so they live in data, not code. The prototype loads plain CSV files at start. Tweak a value, reload, play. Six tables:</p>
+  <div class="tablewrap">
+  <table class="csv">
+    <tr><th>File</th><th>One row is</th><th>Columns to start with</th></tr>
+    <tr><td>settings.csv</td><td>a global knob</td><td>starting scrap, loot cadence, tap radius, rescue HP share, dock offers, calm before docking</td></tr>
+    <tr><td>legs.csv</td><td>a leg</td><td>name, dock forecast, enemy hp and damage multipliers, loot multiplier, boss</td></tr>
+    <tr><td>enemies.csv</td><td>an enemy type</td><td>id, lane, behavior (hold, thief, charger), hp, armor, speed, damage, fire_rate, stay_s, target_rows or target_cols, charge_dmg, charge_break, cargo_count, cargo_value, size</td></tr>
+    <tr><td>waves.csv</td><td>one spawn event in a leg</td><td>leg, time_s, enemy_id, count, spacing_s, note</td></tr>
+    <tr><td>cars.csv</td><td>a car tier</td><td>id, animal, tier, upgrade_to, allowed_facing, hp, cost, damage, fire_rate, auto, collect_radius, reel_s, lifts, passive</td></tr>
+    <tr><td>loot.csv</td><td>a flotsam type</td><td>id, value, drift_speed, spawn_weight, net_ok</td></tr>
+  </table>
+  </div>
+  <p class="caption">Legs are tuned by editing waves.csv only. Rewards live on the enemy, so making a wave harder and making it pay better are separate dials.</p>
+
+  <h2>Decisions so far</h2>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Question</th><th>Call</th></tr>
+    <tr><td>Losing a car <span class="tag set">set</span></td><td>Chain never breaks. The car behind becomes exposed. Drama comes from the rescue, not the collapse.</td></tr>
+    <tr><td>Center car <span class="tag set">set</span></td><td>Always the engine or command car. Destroyed means the run is over. It is the one car you protect.</td></tr>
+    <tr><td>Route choices <span class="tag set">set</span></td><td>Only at docks. Linear legs.</td></tr>
+    <tr><td>Loot pickup <span class="tag set">set</span></td><td>Both by hand and by collectors. Collectors are the progression.</td></tr>
+    <tr><td>Animals <span class="tag set">set</span></td><td>Distinct but cheap: passive, facing, voice. Six for the prototype.</td></tr>
+    <tr><td>Car leveling and skills <span class="tag set">set</span></td><td>Yes, in a later prototype. First prototype ships cars as fixed stats so the loop can be judged on its own.</td></tr>
+    <tr><td>Damage model <span class="tag set">set</span></td><td>Per-car HP, repair only at docks. The center car never repairs, so every hit it takes is permanent for the run. Armor cars in front earn their slot.</td></tr>
+    <tr><td>Name and look <span class="tag set">set</span></td><td>Skywake. Cute animals, simple shapes, easy to read on a phone. Rickety machinery, real sea monsters.</td></tr>
+    <tr><td>Enemies from behind <span class="tag set">set</span></td><td>None for now. The rear column is utility: storage, workshop, lookout. Chaser levels can come later as a biome twist.</td></tr>
+    <tr><td>Theme undertone <span class="tag set">set</span></td><td>Yes, later. Animals versus the Leviathan, in the Hobbes sense of the state, as subtext only: the Leviathan is the final boss, docks carry posters, nobody gives a speech. Not in the first prototype.</td></tr>
+    <tr><td>Balancing <span class="tag set">set</span></td><td>All enemy, wave, car and loot numbers live in CSV files the game reads at load. See Balancing.</td></tr>
+    <tr><td>Aimed enemies <span class="tag set">set</span></td><td>Pass 1, after the first phone test ("no strategy"). Each enemy type may only hit certain rows or columns: skiffs hug the water, gunboats the middle and bottom, gulls the front columns. Where you put armor now matters.</td></tr>
+    <tr><td>Enemy armor <span class="tag set">set</span></td><td>Flat damage taken off every hit. Turrets chip, harpoons crack. The Kraken shrugs off a tier-1 cannon, which is what the dock is for.</td></tr>
+    <tr><td>Thieves and chargers <span class="tag set">set</span></td><td>Frigatebirds dive for floating loot and fly off with it; kill them and they drop it. Rams wind up, then hit the front car of a row; enough damage during the wind-up interrupts them.</td></tr>
+    <tr><td>Car tiers <span class="tag set">set</span></td><td>Cars upgrade at the dock into their next tier row for that row's cost. Tiers are dock purchases, not XP. Cars can also be sold for half and offers re-rolled for scrap.</td></tr>
+    <tr><td>Nets are not free <span class="tag set">set</span></td><td>A net is busy for a reel time after each catch, so bursts overflow it, and a tier-1 net cannot lift crates. The thumb stays in the game after the first net.</td></tr>
+    <tr><td>Six legs, forecast at the dock <span class="tag set">set</span></td><td>Legs live in legs.csv with a name, multipliers and a one-line forecast shown before buying. Bosses at 3 (Kraken) and 6 (Leviathan). A leg summary card shows kills, loot caught, missed and stolen, scrap and engine HP lost.</td></tr>
+    <tr><td>Enemies leave <span class="tag set">set</span></td><td>Found in testing. An enemy you cannot or do not kill leaves after its stay time and takes its cargo with it, so a leg always ends. Bosses never leave.</td></tr>
+  </table>
+  </div>
+
+  <h2>Prototype scope</h2>
+  <div class="scope">
+    <ul>
+      <li>One biome, one boss, three legs.</li>
+      <li>Six cars: engine, cannon, auto-turret, net, hook, armor. Six animals to match.</li>
+      <li>The full drop-and-catch loop, including fallen-car rescue.</li>
+      <li>One dock screen: buy, place, rearrange.</li>
+      <li>Numbers driven by the four CSV files, so waves can be tuned without touching code.</li>
+      <li>Cut from the first prototype: altitude control, multiple weapons per car, events, meta progression.</li>
+      <li>Second prototype, if the loop holds: car leveling, car skills, chaser levels.</li>
+    </ul>
+  </div>
+
+  <footer>Pass 1 (strategy and progression) is in. Next: phone test, then pass 2 (feel: sound, telegraphs, hit feedback), then pass 3 (optimization and a headless balance harness).</footer>
+</div>

@@ -1,0 +1,18 @@
+id,name,animal,emoji,tier,upgrade_to,allowed_facing,hp,cost,damage,fire_rate,auto,collect_radius,reel_s,lifts,passive
+# tiers are rows. Only tier 1 cars appear in dock offers. Upgrading a placed car turns it into its upgrade_to row for that row's cost.
+# allowed_facing: which cell faces the car may sit on, separated by |. core is the center cell only.
+# a weapon only hits enemies whose lane is one of the car's faces in its current cell.
+# auto yes fires or collects on its own. auto no fires when you tap an enemy.
+# reel_s: a net is busy this long after each catch. lifts: light = only net_ok loot, all = everything.
+engine,Engine,Tortoise,🐢,1,,core,30,0,0,0,no,0,0,,Run ends if destroyed
+cannon,Cannon,Fox,🦊,1,cannon2,front,12,30,4,0.7,no,0,0,,Tap an enemy to fire
+cannon2,Cannon II,Fox,🦊,2,cannon3,front,14,40,6,0.6,no,0,0,,Tap an enemy to fire
+cannon3,Cannon III,Fox,🦊,3,,front,16,55,9,0.5,no,0,0,,Tap an enemy to fire
+turret,Turret,Owl,🦉,1,turret2,front|sky,10,45,1.5,0.9,yes,0,0,,Fires on its own
+turret2,Turret II,Owl,🦉,2,,front|sky,12,50,2.5,0.7,yes,0,0,,Fires on its own
+net,Net,Otter,🦦,1,net2,water,8,35,0,0,yes,48,1.2,light,Catches light loot below it
+net2,Net II,Otter,🦦,2,,water,10,45,0,0,yes,64,0.7,all,Catches anything below it
+harpoon,Harpoon,Duck,🦆,1,harpoon2,front|sky,10,40,9,2.2,no,0,0,,"Slow, heavy, tap to fire"
+harpoon2,Harpoon II,Duck,🦆,2,,front|sky,12,55,14,1.8,no,0,0,,"Slow, heavy, tap to fire"
+armor,Armor,Hedgehog,🦔,1,armor2,front|sky|rear,30,25,0,0,no,0,0,,Soaks hits for the car behind
+armor2,Armor II,Hedgehog,🦔,2,,front|sky|rear,50,30,0,0,no,0,0,,Soaks hits for the car behind

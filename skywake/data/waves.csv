@@ -1,0 +1,49 @@
+leg,time_s,enemy_id,count,spacing_s,note
+# one row = one spawn event. time_s is seconds since the leg started. count enemies spawn spacing_s apart.
+# a leg ends when every row has spawned and every enemy is dead or gone. the last leg's final kill wins the run.
+1,3,skiff,1,0,first contact
+1,14,gull,1,0,first sky enemy
+1,24,skiff,2,2,
+1,36,gull,2,1.5,
+1,48,frigatebird,1,0,first thief
+1,58,gunboat,1,0,leg 1 mini boss
+2,3,gull,2,1,
+2,12,balloon,1,0,
+2,22,frigatebird,2,3,
+2,32,skiff,2,1.5,
+2,44,balloon,1,0,
+2,46,gull,2,1,
+2,58,gunboat,1,0,
+2,70,skiff,3,1,
+3,3,gunboat,1,0,
+3,12,skiff,3,1,
+3,24,balloon,1,0,
+3,30,gunboat,2,3,
+3,42,frigatebird,1,0,
+3,55,kraken,1,0,BOSS
+4,3,ram,1,0,first ram
+4,12,skiff,2,1.5,
+4,20,ram,1,0,
+4,30,gull,3,1,
+4,40,ram,2,4,
+4,55,gunboat,1,0,
+4,60,balloon,1,0,
+4,72,ram,1,0,
+4,74,gunboat,1,0,
+5,3,frigatebird,2,2,
+5,12,skiff,3,1,
+5,22,frigatebird,3,2,
+5,34,gunboat,1,0,
+5,40,balloon,2,2,
+5,52,frigatebird,2,2,
+5,60,ram,1,0,
+5,70,gunboat,2,3,
+6,3,gunboat,2,3,
+6,14,balloon,2,2,
+6,24,ram,2,4,
+6,36,frigatebird,2,2,
+6,46,gunboat,1,0,
+6,50,skiff,3,1,
+6,62,leviathan,1,0,BOSS
+6,70,gull,3,1,
+6,90,ram,1,0,

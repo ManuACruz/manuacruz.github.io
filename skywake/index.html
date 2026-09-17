@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f1e25">
+  <title>Skywake prototype</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game"></canvas>
+
+    <div id="title" class="overlay full">
+      <div class="card">
+        <p class="eyebrow">Prototype 1</p>
+        <h1>Skywake</h1>
+        <p>A rickety train of flying ships. Tap enemies to fire. Tap loot on the water to grab it. Nets grab for you.</p>
+        <p>Cars that fall overboard can be fished back. If the engine goes down, the run is over.</p>
+        <button id="start">Set sail</button>
+        <p class="small" id="loadmsg">Loading tables…</p>
+      </div>
+    </div>
+
+    <div id="dock" class="overlay panel" hidden></div>
+
+    <div id="summary" class="overlay full" hidden></div>
+
+    <div id="end" class="overlay full" hidden></div>
+  </div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

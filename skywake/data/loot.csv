@@ -1,0 +1,6 @@
+id,name,emoji,value,drift_speed,spawn_weight,net_ok
+# natural flotsam that drifts through the water lane. spawn_weight is relative.
+# net_ok no: too heavy for a tier 1 net. Grab it by hand or with a Net II.
+bottle,Bottle,🍾,1,60,5,yes
+barrel,Barrel,🛢️,3,50,3,yes
+crate,Crate,📦,6,45,2,no

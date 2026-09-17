@@ -1,0 +1,8 @@
+leg,name,preview,enemy_hp_mult,enemy_dmg_mult,loot_mult,boss
+# one row per leg. preview is shown at the dock before the leg. multipliers scale every enemy and every loot value in that leg.
+1,Calm Shallows,"A lone skiff, then gulls. Learn the ropes.",1,1,1,no
+2,Gull Coast,"Mostly sky. Frigatebirds steal loot. One gunboat late.",1,1,1,no
+3,Kraken Reach,"Gunboats, then the Kraken. Its hide shrugs off light hits.",1.1,1,1.1,yes
+4,Storm Belt,"Rams charge the front row. Hit them hard while they wind up.",1.25,1.2,0.9,no
+5,Thief Strait,"Frigatebirds everywhere. Keep a thumb on the water.",1.4,1.2,1.3,no
+6,The Deep,"Escorts, then the Leviathan.",1.6,1.4,1.2,yes
