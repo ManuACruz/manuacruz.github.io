@@ -1,0 +1,9 @@
+{
+  "name": "skywake",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tools/test.mjs",
+    "sim": "node tools/sim.mjs"
+  }
+}

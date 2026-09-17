@@ -262,9 +262,9 @@
 <div class="page">
   <header>
     <div class="meta">
-      <span class="eyebrow">Concept doc · v0.8</span>
+      <span class="eyebrow">Concept doc · v0.9</span>
       <span class="eyebrow">2026-09-17</span>
-      <span class="eyebrow">Status: prototype 1, pass 2 (feel)</span>
+      <span class="eyebrow">Status: prototype 1, all three passes in</span>
     </div>
     <h1>Skywake</h1>
     <div class="titles">Name chosen for now. Earlier alternates: <span>Flotsam</span>, <span>Caravan</span>.</div>
@@ -361,7 +361,7 @@
     <tr><td>loot.csv</td><td>a flotsam type</td><td>id, value, drift_speed, spawn_weight, net_ok</td></tr>
   </table>
   </div>
-  <p class="caption">Legs are tuned by editing waves.csv only. Rewards live on the enemy, so making a wave harder and making it pay better are separate dials.</p>
+  <p class="caption">Legs are tuned by editing waves.csv only. Rewards live on the enemy, so making a wave harder and making it pay better are separate dials. The simulation runs headless in Node: <code>node tools/sim.mjs --runs 200</code> plays scripted runs against the tables and prints survival per leg, scrap and engine HP at each dock. A scripted player taps perfectly, so its survival is an upper bound.</p>
 
   <h2>Decisions so far</h2>
   <div class="tablewrap">
@@ -385,6 +385,7 @@
     <tr><td>Nets are not free <span class="tag set">set</span></td><td>A net is busy for a reel time after each catch, so bursts overflow it, and a tier-1 net cannot lift crates. The thumb stays in the game after the first net.</td></tr>
     <tr><td>Six legs, forecast at the dock <span class="tag set">set</span></td><td>Legs live in legs.csv with a name, multipliers and a one-line forecast shown before buying. Bosses at 3 (Kraken) and 6 (Leviathan). A leg summary card shows kills, loot caught, missed and stolen, scrap and engine HP lost.</td></tr>
     <tr><td>Feel, pass 2 <span class="tag set">set</span></td><td>Synthesised sounds (no files) with a mute toggle, haptics on Android, aim lines before every enemy shot, hit sparks, knockback, tap ripples and reticle, slow motion on overboard and boss kills, a pier that scrolls in as the train stops, boss banner with the sea going dark, animal speech bubbles, home-screen install and pause when the app is backgrounded.</td></tr>
+    <tr><td>Engineering, pass 3 <span class="tag set">set</span></td><td>The simulation is a pure module with a seeded random generator, so runs replay exactly and the same code drives the balance harness and the tests. Fixed 60 Hz timestep, emoji rasterised once, pixel ratio capped. Nine invariant tests guard the rules that must never break.</td></tr>
     <tr><td>Enemies leave <span class="tag set">set</span></td><td>Found in testing. An enemy you cannot or do not kill leaves after its stay time and takes its cargo with it, so a leg always ends. Bosses never leave.</td></tr>
   </table>
   </div>
@@ -402,5 +403,5 @@
     </ul>
   </div>
 
-  <footer>Passes 1 (strategy) and 2 (feel) are in, live at manuacruz.github.io/skywake. Next: phone test, then pass 3 (optimization and a headless balance harness).</footer>
+  <footer>All three passes are in, live at manuacruz.github.io/skywake. First harness read: a perfect scripted player wins 83% of runs and only ever dies on leg 6, so legs 1 to 5 have room to get harder. Next: phone test, then tune waves.csv with the harness.</footer>
 </div>

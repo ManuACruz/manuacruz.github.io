@@ -2,7 +2,7 @@
 // Numbers become numbers, "yes"/"no" become booleans, everything else stays a string.
 
 export async function loadCSV(path) {
-  const res = await fetch(path);
+  const res = await fetch(path, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Cannot load ${path} (${res.status})`);
   return parseCSV(await res.text());
 }

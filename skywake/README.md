@@ -52,11 +52,51 @@ Lines starting with `#` are comments. `yes`/`no` become booleans, numbers become
 - Enemies show a red line to the car they are about to hit. Rams show a wind-up bar. Thieves show a dotted line to the loot they are diving for.
 - Add the page to the home screen for a fullscreen, portrait-locked app. The game pauses when you switch apps.
 
-## Test hooks
+## Balance harness
+
+The simulation has no DOM in it, so it runs in Node. The harness plays hundreds of scripted runs
+against the current tables and prints survival per leg, scrap and engine HP at each dock, and loot
+caught, missed and stolen:
+
+```bash
+node tools/sim.mjs --runs 200 --policy greedy --grab 0.6 --seed 1
+```
+
+Policies: `greedy` taps every enemy, hand-grabs heavy loot with probability `--grab` per second, and
+buys and upgrades sensibly at the dock. `passive` never buys. `noshoot` never taps, which shows what the
+ship does on its own. Edit a CSV, run it again, compare.
+
+A scripted player taps perfectly, so treat its survival as an upper bound. If it dies on a leg, a human will.
+
+## Tests
+
+```bash
+node --test tools/test.mjs
+```
+
+Covers the CSV reader, table validation, and the rules that must never break: a leg cannot stall,
+engine death ends the run, a fallen car can be rescued into its old cell, upgrades keep the cell and
+charge the next tier, thieves drop loot when killed, an interrupted ram does no damage, and the same
+seed replays the same run.
+
+## Code map
+
+| File | Role |
+| --- | --- |
+| `src/sim.js` | the whole game as rules and state, no DOM. Emits events for sounds, vibration and overlays |
+| `src/render.js` | canvas drawing. Emoji are rasterised once per size, gradients cached, pixel ratio capped at 2 |
+| `src/ui.js` | HTML overlays: summary, dock panel, pause, end |
+| `src/audio.js` | synthesised sounds, mute, vibration |
+| `src/main.js` | boot, fixed 60 Hz timestep, input, event dispatch, the `SKY` console hook |
+| `src/layout.js` | screen geometry shared by sim and renderer |
+| `src/csv.js`, `src/rng.js` | CSV reader and the seedable random generator |
+
+## Console hooks
 
 Open the browser console:
 
 - `SKY.step(10)` advances the game ten seconds in fixed ticks and redraws.
 - `SKY.tap(x, y)` taps at a point in the 360×640 logical space.
 - `SKY.jump(4)` starts leg 4 with the current ship. `SKY.give('turret2', 0, 0)` places a car at column 0, row 0.
+- `SKY.fps()` is the frame rate over the last two seconds. `SKY.seed` is the run seed; add `?seed=42` to the URL to replay one.
 - `SKY.G` is the run state, `SKY.DATA` the loaded tables.
