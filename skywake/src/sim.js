@@ -86,6 +86,12 @@ export function createSim(DATA, S, opts = {}) {
   function legEnded() {
     return G.rowIdx >= G.legRows.length && G.pending.length === 0 && G.enemies.length === 0 && !G.loot.some((l) => l.kind === 'car');
   }
+  // seconds from leg start until the last enemy of the leg has spawned, plus a short tail
+  function legLength() {
+    let end = 0;
+    for (const w of G.legRows) end = Math.max(end, w.time_s + Math.max(0, w.count - 1) * (w.spacing_s || 0));
+    return end + 4;
+  }
   function say(x, y, str, color = '#ffffff', big = false) {
     let n = 0;
     for (const t of G.texts) if (!t.big && t.t < 0.35 && Math.abs(t.x - x) < 16 && Math.abs(t.y - y) < 16) n++;
@@ -576,7 +582,7 @@ export function createSim(DATA, S, opts = {}) {
   Object.assign(sim, {
     newRun, startLeg, update, tap, pause, resume,
     openDock, chooseOffer, reroll, upgrade, startMove, sell, sail,
-    legEnded, legDef, engine, canTarget, carCenter,
+    legEnded, legLength, legDef, engine, canTarget, carCenter,
     // test helpers
     give: (id, col, row) => placeCar(makeCar(id), col, row),
     takeEvents() { const ev = sim.events; sim.events = []; return ev; },

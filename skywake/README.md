@@ -50,6 +50,7 @@ Lines starting with `#` are comments. `yes`/`no` become booleans, numbers become
 - Sounds are synthesised in `src/audio.js` with WebAudio, no asset files. The speaker icon in the top-right mutes them and remembers the choice.
 - Android phones vibrate on hits, overboard and rescue. iPhones ignore it.
 - Enemies show a red line to the car they are about to hit. Rams show a wind-up bar. Thieves show a dotted line to the loot they are diving for.
+- Everything on a timer has a bar. Under the HUD, the leg timeline fills as the leg runs, with a tick per wave and a red marker for a boss wave. Each car has a reload bar (weapons) or a reel bar (nets) along its top edge. Each enemy has a red bar for its next shot and an amber bar draining toward the moment it leaves with its cargo.
 - Add the page to the home screen for a fullscreen, portrait-locked app. The game pauses when you switch apps.
 
 ## Balance harness

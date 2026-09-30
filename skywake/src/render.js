@@ -56,6 +56,13 @@ export function createRenderer(canvas, stage, sim) {
     ctx.fillStyle = p > 0.5 ? '#6fd06f' : p > 0.25 ? '#f2b843' : '#f0503c';
     ctx.fillRect(x, y, w * p, h);
   }
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  // thin progress bar for anything on a timer: p is 0..1 of the way to ready
+  function timerBar(x, y, w, p, color, ready = false, h = 3) {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = color; ctx.fillRect(x, y, w * clamp01(p), h);
+    if (ready) { ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1); }
+  }
   function label(str, x, y, size = 11, color = '#ffffff', align = 'center') {
     ctx.font = `bold ${size}px "Segoe UI", system-ui, sans-serif`;
     ctx.textAlign = align; ctx.textBaseline = 'middle';
@@ -180,11 +187,13 @@ export function createRenderer(canvas, stage, sim) {
       }
       emoji(car.def.emoji, x + k.w / 2, y + k.h / 2 - 4, 26);
       hpBar(x + 6, y + k.h - 9, k.w - 12, car.hp, car.def.hp);
-      if (car.def.tier > 1) label('I'.repeat(car.def.tier), x + k.w - 8, y + 9, 10, '#ffffff', 'right');
-      if (!car.def.auto && car.def.damage > 0) {
-        const p = car.def.fire_rate ? 1 - Math.max(0, Math.min(1, car.cd / car.def.fire_rate)) : 1;
-        ctx.strokeStyle = p >= 1 ? '#ffffff' : 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(x + 9, y + 9, 5, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke();
+      if (car.def.tier > 1) label('I'.repeat(car.def.tier), x + k.w - 8, y + 14, 10, '#ffffff', 'right');
+      // reload bar (weapons) or reel bar (nets) along the top edge
+      if (car.def.damage > 0 && car.def.fire_rate) {
+        const p = 1 - clamp01(car.cd / car.def.fire_rate);
+        timerBar(x + 6, y + 4, k.w - 12, p, car.def.auto ? 'rgba(255,255,255,0.55)' : '#ffffff', p >= 1 && !car.def.auto && mode === 'sail');
+      } else if (car.def.collect_radius > 0 && car.def.reel_s) {
+        timerBar(x + 6, y + 4, k.w - 12, 1 - clamp01(car.busy / car.def.reel_s), '#bfe6f5');
       }
     }
     const e = sim.engine();
@@ -228,7 +237,15 @@ export function createRenderer(canvas, stage, sim) {
       if (e.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${e.flash * 3})`; ctx.beginPath(); ctx.arc(e.x, e.y + bob, size * 0.7, 0, Math.PI * 2); ctx.fill(); }
       emoji(e.def.emoji, e.x, e.y + bob, size);
       if (e.carry) emoji(e.carry.emoji, e.x + size * 0.4, e.y + bob + size * 0.45, 14);
-      if (!e.leaving) hpBar(e.x - size * 0.6, e.y + bob - size * 0.75, size * 1.2, e.hp, e.maxHp, e.def.size >= 2 ? 6 : 4);
+      if (!e.leaving) {
+        const bw = size * 1.2, bx = e.x - size * 0.6, by = e.y + bob - size * 0.75, bh = e.def.size >= 2 ? 6 : 4;
+        hpBar(bx, by, bw, e.hp, e.maxHp, bh);
+        let ny = by + bh + 2;
+        // time to its next shot, dive or charge
+        if (e.state === 'hold' && e.def.fire_rate > 0) { timerBar(bx, ny, bw, 1 - clamp01(e.cd / e.def.fire_rate), '#f0503c', false, 2); ny += 4; }
+        // time before it gives up and leaves with its cargo
+        if (e.def.stay_s > 0 && e.state !== 'approach') timerBar(bx, ny, bw, 1 - clamp01(e.held / e.def.stay_s), '#ffd08a', false, 2);
+      }
       if (e.def.armor > 0 && !e.leaving) label(`🛡${e.def.armor}`, e.x + size * 0.6, e.y + bob - size * 0.75 - 7, 9, '#ffffff', 'right');
       if (e.kb > 0) ctx.restore();
     }
@@ -347,6 +364,22 @@ export function createRenderer(canvas, stage, sim) {
     ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.fillText('ENGINE', W / 2 - 24, 15);
     const e = sim.engine();
     hpBar(W / 2 + 4, 11, 80, e.hp, e.def.hp, 8);
+    // leg timeline: how far into the leg we are, a tick per wave, a red marker for a boss wave
+    if (sim.mode === 'sail' || sim.mode === 'paused') {
+      const len = sim.legLength();
+      const by = 30, bh = 5;
+      const p = clamp01(G.legTime / len);
+      ctx.fillStyle = 'rgba(15,30,37,0.45)'; ctx.fillRect(0, by, W, bh);
+      ctx.fillStyle = sim.legEnded() ? '#6fd06f' : '#e5964a'; ctx.fillRect(0, by, W * p, bh);
+      for (const r of G.legRows) {
+        const tx = W * clamp01(r.time_s / len);
+        const boss = (DATA.enemies[r.enemy_id]?.size || 1) >= 2;
+        const past = r.time_s <= G.legTime;
+        ctx.fillStyle = past ? 'rgba(255,255,255,0.35)' : boss ? '#f0503c' : '#ffffff';
+        if (boss) ctx.fillRect(tx - 2, by - 2, 4, bh + 4); else ctx.fillRect(tx - 1, by, 2, bh);
+      }
+      if (p >= 1 && !sim.legEnded()) label('clear the sea', W / 2, by + 14, 10, '#ffd08a');
+    }
     if (sim.mode === 'sail') {
       ctx.font = '12px "Segoe UI", system-ui, sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
