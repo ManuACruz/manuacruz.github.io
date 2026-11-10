@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#14162b" />
+    <meta name="robots" content="noindex" />
+    <title>Light-Up sound board</title>
+    <style>:root{--lightningcss-light: ;--lightningcss-dark:initial;color-scheme:dark}body{color:#e9eaf6;background:#14162b;margin:0;padding:20px 16px 48px;font:16px/1.45 system-ui,Segoe UI,Roboto,sans-serif}main{max-width:760px;margin:0 auto}h1{margin:0 0 4px;font-size:22px}p{color:#a9acd0;margin:0 0 14px}.bar{flex-wrap:wrap;align-items:center;gap:10px 18px;margin:0 0 22px;display:flex}label{cursor:pointer;align-items:center;gap:8px;display:inline-flex}section{background:#1d2040;border-radius:14px;margin:0 0 20px;padding:14px}h2{margin:0;font-size:17px}.what{margin:2px 0 10px;font-size:14px}.notes{grid-template-columns:repeat(auto-fit,minmax(42px,1fr));gap:8px;margin-bottom:12px;display:grid}button{font:inherit;color:#14162b;cursor:pointer;touch-action:manipulation;border:0;border-radius:999px}.notes button{aspect-ratio:1;background:var(--c,#ffd23f);min-width:0;padding:0;font-size:14px;font-weight:600}.notes button:active,.pill:active{transform:scale(.92)}.pill{background:#e9eaf6;padding:8px 16px;font-weight:600}section .pill+.pill{margin-left:6px}</style>
+    <script type="module" crossorigin src="./assets/sounds-hSp8hvlc.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/game-DQ7LjU_8.js">
+  </head>
+  <body>
+    <main>
+      <h1>Light-Up sound board</h1>
+      <p>
+        Every instrument in the game, one per block. Tap a circle for a single note (low on the left, high on the
+        right), or play the whole scale. Tell me the names of the ones to keep, change or drop.
+      </p>
+      <div class="bar">
+        <label><input type="checkbox" id="reverb" checked /> Room reverb</label>
+        <button class="pill" id="row">Across the band, one note</button>
+        <button class="pill" id="wave">Celebration wave</button>
+      </div>
+      <div id="band"></div>
+    </main>
+  </body>
+</html>
