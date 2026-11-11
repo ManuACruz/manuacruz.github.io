@@ -1,0 +1,4 @@
+Instrument recordings from the Versilian Community Sample Library (VCSL)
+by Versilian Studios LLC and contributors, https://github.com/sgossner/VCSL
+Released under CC0 1.0 Universal (public domain dedication).
+Trimmed, level-matched and re-encoded by scripts/build-samples.mjs.
