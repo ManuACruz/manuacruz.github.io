@@ -26,7 +26,7 @@ what you said, in order, in `voices-raw/<same name>.txt`:
 
 Single takes work too: `ma-lo.m4a`, `ma-hi.m4a`, `pa-lo-2.wav` ...
 
-The game's syllables are mi pa ma ka te pi bi da la bo ku ne, but any
+The game uses m p n t b k with a e i o u (ma, pe, ni ...), but any
 syllable can be recorded. Creatures whose own syllable has no recording
 borrow a recorded one, so three or four syllables are already enough for
 every creature to have a real voice. A syllable recorded in only one tone

@@ -1,1 +1,242 @@
-{}
+{
+  "ma": {
+    "lo": [
+      "ma-lo-1.wav"
+    ],
+    "hi": [
+      "ma-hi-1.wav"
+    ]
+  },
+  "me": {
+    "lo": [
+      "me-lo-1.wav"
+    ],
+    "hi": [
+      "me-hi-1.wav"
+    ]
+  },
+  "mi": {
+    "lo": [
+      "mi-lo-1.wav"
+    ],
+    "hi": [
+      "mi-hi-1.wav"
+    ]
+  },
+  "mo": {
+    "lo": [
+      "mo-lo-1.wav"
+    ],
+    "hi": [
+      "mo-hi-1.wav"
+    ]
+  },
+  "mu": {
+    "lo": [
+      "mu-lo-1.wav"
+    ],
+    "hi": [
+      "mu-hi-1.wav"
+    ]
+  },
+  "pa": {
+    "lo": [
+      "pa-lo-1.wav"
+    ],
+    "hi": [
+      "pa-hi-1.wav"
+    ]
+  },
+  "pe": {
+    "lo": [
+      "pe-lo-1.wav"
+    ],
+    "hi": [
+      "pe-hi-1.wav"
+    ]
+  },
+  "pi": {
+    "lo": [
+      "pi-lo-1.wav"
+    ],
+    "hi": [
+      "pi-hi-1.wav"
+    ]
+  },
+  "po": {
+    "lo": [
+      "po-lo-1.wav"
+    ],
+    "hi": [
+      "po-hi-1.wav"
+    ]
+  },
+  "pu": {
+    "lo": [
+      "pu-lo-1.wav"
+    ],
+    "hi": [
+      "pu-hi-1.wav"
+    ]
+  },
+  "na": {
+    "lo": [
+      "na-lo-1.wav"
+    ],
+    "hi": [
+      "na-hi-1.wav"
+    ]
+  },
+  "ne": {
+    "lo": [
+      "ne-lo-1.wav"
+    ],
+    "hi": [
+      "ne-hi-1.wav"
+    ]
+  },
+  "ni": {
+    "lo": [
+      "ni-lo-1.wav"
+    ],
+    "hi": [
+      "ni-hi-1.wav"
+    ]
+  },
+  "no": {
+    "lo": [
+      "no-lo-1.wav"
+    ],
+    "hi": [
+      "no-hi-1.wav"
+    ]
+  },
+  "nu": {
+    "lo": [
+      "nu-lo-1.wav"
+    ],
+    "hi": [
+      "nu-hi-1.wav"
+    ]
+  },
+  "ta": {
+    "lo": [
+      "ta-lo-1.wav"
+    ],
+    "hi": [
+      "ta-hi-1.wav"
+    ]
+  },
+  "te": {
+    "lo": [
+      "te-lo-1.wav"
+    ],
+    "hi": [
+      "te-hi-1.wav"
+    ]
+  },
+  "ti": {
+    "lo": [
+      "ti-lo-1.wav"
+    ],
+    "hi": [
+      "ti-hi-1.wav"
+    ]
+  },
+  "to": {
+    "lo": [
+      "to-lo-1.wav"
+    ],
+    "hi": [
+      "to-hi-1.wav"
+    ]
+  },
+  "tu": {
+    "lo": [
+      "tu-lo-1.wav"
+    ],
+    "hi": [
+      "tu-hi-1.wav"
+    ]
+  },
+  "ba": {
+    "lo": [
+      "ba-lo-1.wav"
+    ],
+    "hi": [
+      "ba-hi-1.wav"
+    ]
+  },
+  "be": {
+    "lo": [
+      "be-lo-1.wav"
+    ],
+    "hi": [
+      "be-hi-1.wav"
+    ]
+  },
+  "bi": {
+    "lo": [
+      "bi-lo-1.wav"
+    ],
+    "hi": [
+      "bi-hi-1.wav"
+    ]
+  },
+  "bo": {
+    "lo": [
+      "bo-lo-1.wav"
+    ],
+    "hi": [
+      "bo-hi-1.wav"
+    ]
+  },
+  "bu": {
+    "lo": [
+      "bu-lo-1.wav"
+    ],
+    "hi": [
+      "bu-hi-1.wav"
+    ]
+  },
+  "ka": {
+    "lo": [
+      "ka-lo-1.wav"
+    ],
+    "hi": [
+      "ka-hi-1.wav"
+    ]
+  },
+  "ke": {
+    "lo": [
+      "ke-lo-1.wav"
+    ],
+    "hi": [
+      "ke-hi-1.wav"
+    ]
+  },
+  "ki": {
+    "lo": [
+      "ki-lo-1.wav"
+    ],
+    "hi": [
+      "ki-hi-1.wav"
+    ]
+  },
+  "ko": {
+    "lo": [
+      "ko-lo-1.wav"
+    ],
+    "hi": [
+      "ko-hi-1.wav"
+    ]
+  },
+  "ku": {
+    "lo": [
+      "ku-lo-1.wav"
+    ],
+    "hi": [
+      "ku-hi-1.wav"
+    ]
+  }
+}
