@@ -7,6 +7,42 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let openId = null;
 let panel = null;
 
+// ---------- Hero faces: a new random Papepi face on every circle, every visit ----------
+
+function shuffled(list) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const HAPPY_MOUTHS = ['vee', 'bowl', 'tick']; // smile, grin, little heart-shaped smile
+
+async function randomFaces() {
+  const blobs = document.querySelector('.blobs');
+  try {
+    const { EYES, MOUTHS, EYE_GAP } = await import('./face-parts.js');
+    const eyes = shuffled(EYES);
+    const mouths = shuffled(MOUTHS.filter((m) => HAPPY_MOUTHS.includes(m.name)));
+    blobs.querySelectorAll('.blob').forEach((blob, i) => {
+      const e = eyes[i % eyes.length];
+      const m = mouths[i % mouths.length];
+      // Any eyes go with any mouth: a wide mouth shrinks when big eyes would touch its ends (as in the game).
+      const s = m.wide ? Math.min(1, (1 - e.w - EYE_GAP - Math.abs(m.cx)) / m.w) : 1;
+      const mouth = s < 1
+        ? `<path d="${m.d}" transform="translate(${m.cx} ${m.cy}) scale(${s.toFixed(3)}) translate(${-m.cx} ${-m.cy})" stroke-width="${(0.09 / s).toFixed(3)}"/>`
+        : `<path d="${m.d}"/>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1.5 -0.75 3 1.5"><g fill="#2b2340" fill-rule="evenodd" stroke="#2b2340" stroke-width="0.09" stroke-linejoin="round"><path d="${e.d}"/>${mouth}</g></svg>`;
+      blob.style.setProperty('--face', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+    });
+  } catch {
+    // keep the fixed faces from the stylesheet
+  }
+  blobs.classList.add('ready');
+}
+
 // ---------- Rendering ----------
 
 function mediaFrame(item) {
@@ -190,6 +226,7 @@ function toggle(id) {
 
 // ---------- Wiring ----------
 
+randomFaces();
 renderCards();
 
 document.addEventListener('keydown', (e) => {

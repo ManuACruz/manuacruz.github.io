@@ -127,22 +127,24 @@ a { color: inherit; }
   opacity: 0.9;
   animation: float var(--d) ease-in-out infinite alternate;
 }
-.blob::before, .blob::after {
+/* Faces are Papepi's hand-drawn eyes and mouths (media/faces, made from the game's face data). */
+.blob::before {
   content: '';
   position: absolute;
-  top: 40%;
-  width: 11%;
-  height: 11%;
-  border-radius: 50%;
-  background: var(--ink);
+  left: 11%;
+  top: 30%;
+  width: 78%;
+  height: 39%;
+  background: var(--face) center / contain no-repeat;
 }
-.blob::before { left: 32%; }
-.blob::after { right: 32%; }
-.b1 { --s: 120px; --c: var(--sun);   --d: 7s;   top: 10%; left: 7%; }
-.b2 { --s: 76px;  --c: var(--mint);  --d: 6s;   top: 18%; right: 11%; }
-.b3 { --s: 150px; --c: var(--pink);  --d: 8s;   bottom: 9%; left: -36px; }
-.b4 { --s: 96px;  --c: var(--sky);   --d: 6.5s; bottom: 16%; right: 5%; }
-.b5 { --s: 54px;  --c: var(--lilac); --d: 5.5s; top: 62%; left: 26%; }
+/* With JS the faces are picked at random on each visit: fade them in once chosen. */
+.js .blob::before { opacity: 0; transition: opacity 0.4s ease; }
+.js .blobs.ready .blob::before { opacity: 1; }
+.b1 { --s: 120px; --c: var(--sun);   --d: 7s;   --face: url('media/faces/face-1.svg'); top: 10%; left: 7%; }
+.b2 { --s: 76px;  --c: var(--mint);  --d: 6s;   --face: url('media/faces/face-2.svg'); top: 18%; right: 11%; }
+.b3 { --s: 150px; --c: var(--pink);  --d: 8s;   --face: url('media/faces/face-3.svg'); bottom: 9%; left: -36px; }
+.b4 { --s: 96px;  --c: var(--sky);   --d: 6.5s; --face: url('media/faces/face-4.svg'); bottom: 16%; right: 5%; }
+.b5 { --s: 54px;  --c: var(--lilac); --d: 5.5s; --face: url('media/faces/face-5.svg'); top: 62%; left: 26%; }
 @keyframes float {
   from { transform: translate(0, 0) rotate(-6deg); }
   to   { transform: translate(10px, -22px) rotate(6deg); }
