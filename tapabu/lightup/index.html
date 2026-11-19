@@ -16,13 +16,20 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <script type="module" crossorigin src="./assets/main-DCFn9AxX.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/game-DNb0iq3f.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-CUdkHvMQ.css">
+    <script type="module" crossorigin src="./assets/main-Cp7cFGms.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/game-B-4EmtcJ.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-DBzRw_PR.css">
   </head>
   <body>
     <!-- The whole game is one canvas: no start screen, the first touch on a
          sleeping bulb is the first move (and the gesture that unlocks audio). -->
     <canvas id="stage"></canvas>
+    <!-- Splash screen: the name, the author and the version over the sleeping
+         bulbs; it fades out by itself (src/intro.js). -->
+    <div id="splash" class="splash" role="img" aria-label="Light-Up, by ManuACruz">
+      <div class="splash-name" aria-hidden="true"><span>L</span><span>i</span><span>g</span><span>h</span><span>t</span><span>-</span><span>U</span><span>p</span></div>
+      <div class="splash-by" aria-hidden="true">by ManuACruz</div>
+      <div class="splash-version" aria-hidden="true"></div>
+    </div>
   </body>
 </html>

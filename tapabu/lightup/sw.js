@@ -3,7 +3,7 @@
 // once (index, hashed bundles, audio, icons) keeps working offline.
 // Registered only from production builds (see main.js).
 
-const CACHE = 'lightup-v2';
+const CACHE = 'lightup-v3';
 const PRECACHE = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -19,7 +19,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // only this game's own old caches: the site's other games share the origin
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('lightup-') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
