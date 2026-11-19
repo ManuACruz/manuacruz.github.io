@@ -1,4 +1,4 @@
-import{n as e,t}from"./index-D9m9fXpg.js";var n=`
+import{n as e,t}from"./index-BfX30216.js";var n=`
 #fx-board {
   position: fixed; left: 0; top: 0; bottom: 0; z-index: 18;
   width: min(400px, 94vw); box-sizing: border-box; padding: 14px 14px 40px;
