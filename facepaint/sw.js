@@ -1,4 +1,4 @@
-// This game moved to /tapabu/facepaint/. This worker replaces the old offline
+// This game moved to /tapabu/papepi/ (via /tapabu/facepaint/). This worker replaces the old offline
 // cache: it clears it, unregisters itself and reloads open pages, which then
 // reach the redirect in index.html.
 

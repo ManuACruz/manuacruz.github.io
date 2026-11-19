@@ -35,7 +35,7 @@ export const GAMES = [
     id: 'papepi',
     name: 'Papepi',
     age: '2-5',
-    url: 'facepaint/',
+    url: 'papepi/',
     tagline: 'Paint little odd creatures and build up your garden.',
     media: [{ kind: 'tile', icon: 'media/papepi-icon.png', bg: '#ffd6e6', alt: 'Papepi' }],
     goals: [
