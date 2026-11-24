@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <title>Night Cycle</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23202226'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%236fe6ff' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <canvas id="labels"></canvas>
+
+  <div id="hud" hidden>
+    <div id="status">
+      <div class="brand">RV-7 <span>NIGHT CYCLE</span> <em id="clock">03:00 AM</em></div>
+      <div class="meter" id="batt"><i>BATT</i><div class="bar"><div id="batt-bar"></div></div><b id="batt-pct">100%</b></div>
+      <div class="meter" id="bin"><i>BIN</i><div class="bar"><div id="bin-bar"></div></div><b id="bin-pct">0%</b></div>
+      <div class="keys">
+        <span id="k-suction"><kbd>E</kbd><b>SUCTION</b></span>
+        <span id="k-light"><kbd>F</kbd><b>LAMP</b></span>
+        <span id="k-scan"><kbd>SPACE</kbd><b>SCAN</b></span>
+      </div>
+      <div id="status-line">CLEANING</div>
+      <div id="hidden-tag">UNDER COVER</div>
+    </div>
+
+    <div id="task" hidden>
+      <div class="task-label">TASK</div>
+      <div id="task-title"></div>
+      <div class="task-bar"><div id="task-bar"></div></div>
+      <div id="task-pct"></div>
+    </div>
+
+    <div id="mapbox">
+      <canvas id="map" width="224" height="160"></canvas>
+      <div id="room-name">LIVING ROOM</div>
+    </div>
+
+    <div id="motion"><span>MOTION</span><b id="motion-d">0.0 m</b></div>
+    <div id="notes"></div>
+    <div id="card"><div class="card-kind"></div><div class="card-name"></div><div class="card-text"></div></div>
+    <div id="hint"></div>
+    <div id="subtitle"></div>
+    <div class="frame-corner tl"></div><div class="frame-corner tr"></div><div class="frame-corner bl"></div><div class="frame-corner br"></div>
+  </div>
+
+  <div id="touch" hidden>
+    <div class="zone"></div>
+    <div class="stick"><div class="knob"></div></div>
+    <div class="tbtns">
+      <button data-act="scan">SCAN</button>
+      <button data-act="light">LAMP</button>
+      <button data-act="suction">SUCT</button>
+    </div>
+    <button id="touch-pause">II</button>
+  </div>
+
+  <section id="title" class="overlay">
+    <div class="panel title-panel">
+      <h1 class="logo" data-text="NIGHT CYCLE">NIGHT CYCLE</h1>
+      <p class="tag">You are a robot vacuum. The house is empty.<br>Mostly.</p>
+      <button id="btn-start" class="big">Start cleaning cycle</button>
+      <button id="btn-settings-title" class="ghost">Settings</button>
+      <div class="controls keys-only">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive</div>
+        <div><kbd>Mouse</kbd> look</div>
+        <div><kbd>E</kbd> suction</div>
+        <div><kbd>F</kbd> headlamp</div>
+        <div><kbd>Space</kbd> LIDAR scan</div>
+        <div><kbd>Esc</kbd> pause</div>
+      </div>
+      <div class="controls touch-only">
+        <div>Left thumb: drive</div>
+        <div>Right thumb: look</div>
+        <div>SUCT: suction</div>
+        <div>LAMP: headlamp</div>
+        <div>SCAN: LIDAR</div>
+        <div>II: pause</div>
+      </div>
+      <p class="muted small">Headphones recommended. Sound tells you where it is.</p>
+    </div>
+  </section>
+
+  <section id="pause" class="overlay" hidden>
+    <div class="panel">
+      <h2>PAUSED</h2>
+      <button id="btn-resume" class="big">Resume</button>
+      <button id="btn-settings-pause" class="ghost">Settings</button>
+      <button id="btn-restart" class="ghost">Restart night</button>
+      <h3>Archive <span id="archive-count"></span></h3>
+      <div id="archive-list"></div>
+    </div>
+  </section>
+
+  <section id="settings" class="overlay" hidden>
+    <div class="panel">
+      <h2>SETTINGS</h2>
+      <div id="settings-body"></div>
+      <button id="btn-settings-back" class="big">Back</button>
+    </div>
+  </section>
+
+  <section id="death" class="overlay" hidden>
+    <div class="panel death-panel">
+      <h2 id="death-title" class="glitch">SIGNAL LOST</h2>
+      <p id="death-reason"></p>
+      <button id="btn-retry" class="big">Reboot from last task</button>
+      <button id="btn-restart-dead" class="ghost">Restart night</button>
+    </div>
+  </section>
+
+  <section id="end" class="overlay" hidden>
+    <div class="panel">
+      <h2>NIGHT 1 COMPLETE</h2>
+      <p class="tag">The house is clean. The house is not empty.</p>
+      <div id="end-stats"></div>
+      <p class="muted">Night 2: the laundry room.</p>
+      <button id="btn-again" class="big">Play again</button>
+    </div>
+  </section>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

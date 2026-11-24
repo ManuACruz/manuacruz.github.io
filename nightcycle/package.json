@@ -1,0 +1,7 @@
+{
+  "name": "night-cycle",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "node tools/check.mjs" },
+  "vendored": { "three": "0.187.0" }
+}
