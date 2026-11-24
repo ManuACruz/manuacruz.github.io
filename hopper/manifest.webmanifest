@@ -1,0 +1,14 @@
+{
+  "name": "Hopper",
+  "short_name": "Hopper",
+  "description": "Tap the pins, swing on your tongue, fill the sticker album.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#a9c8ec",
+  "theme_color": "#a9c8ec",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

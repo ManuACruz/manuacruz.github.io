@@ -1,0 +1,6 @@
+{
+  "name": "hopper",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "node tools/check.mjs" }
+}

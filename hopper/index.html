@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#a9c8ec">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hopper">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Hopper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game"></canvas>
+
+    <div id="hud-buttons">
+      <button id="btn-restart" class="round" aria-label="Restart">↻</button>
+      <button id="btn-settings" class="round" aria-label="Settings">⚙</button>
+    </div>
+
+    <button id="btn-next" class="big" hidden>Next <span>▸</span></button>
+
+    <div id="title" class="overlay">
+      <div class="title-card">
+        <h1 class="logo" aria-label="Hopper"><span>H</span><span>o</span><span>p</span><span>p</span><span>e</span><span>r</span></h1>
+        <p class="sub">Tap the pins · swipe up to jump · fill the sticker album</p>
+        <button id="btn-play" class="big">Play <span>▸</span></button>
+      </div>
+    </div>
+
+    <div id="settings" class="overlay" hidden></div>
+  </div>
+  <script type="module" src="src/game.js"></script>
+</body>
+</html>

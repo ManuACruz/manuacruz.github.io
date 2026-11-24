@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a9c8ec"/>
+      <stop offset="1" stop-color="#e4eefa"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b8ec74"/>
+      <stop offset="0.6" stop-color="#93d64f"/>
+      <stop offset="1" stop-color="#4f9a2a"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#sky)"/>
+  <!-- pin -->
+  <circle cx="98" cy="28" r="13" fill="#b86a00"/>
+  <circle cx="98" cy="26" r="13" fill="#ff9f1c" stroke="#fff" stroke-width="4"/>
+  <!-- body + eye bumps -->
+  <g stroke="#21401a" stroke-width="5" stroke-linejoin="round">
+    <path d="M22 104 C16 80 20 54 48 50 C60 48 76 48 88 54 C108 62 110 86 104 104 Q64 112 22 104 Z" fill="url(#body)"/>
+    <circle cx="48" cy="48" r="13" fill="#a6e264"/>
+    <circle cx="74" cy="46" r="14" fill="#a6e264"/>
+  </g>
+  <path d="M24 102 C20 82 22 58 48 54 C60 52 76 52 88 58 C106 66 108 86 102 102 Z" fill="url(#body)"/>
+  <!-- eyes -->
+  <g stroke="#21401a" stroke-width="2.5" fill="#fff">
+    <circle cx="48" cy="47" r="9.5"/>
+    <circle cx="74" cy="45" r="10.5"/>
+  </g>
+  <circle cx="51" cy="46" r="4.5" fill="#1b1b2a"/>
+  <circle cx="78" cy="43" r="5" fill="#1b1b2a"/>
+  <circle cx="49.5" cy="44.5" r="1.6" fill="#fff"/>
+  <circle cx="76.5" cy="41.5" r="1.8" fill="#fff"/>
+  <!-- wide open mouth -->
+  <path d="M34 72 Q64 66 96 68 Q70 100 34 72 Z" fill="#6b1230" stroke="#21401a" stroke-width="4" stroke-linejoin="round"/>
+  <!-- tongue to the pin -->
+  <path d="M68 78 Q100 70 98 27" fill="none" stroke="#b8325f" stroke-width="11" stroke-linecap="round"/>
+  <path d="M68 78 Q100 70 98 27" fill="none" stroke="#ff6f9c" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="98" cy="27" r="6" fill="#ff6f9c" stroke="#b8325f" stroke-width="2"/>
+  <!-- cheeks -->
+  <ellipse cx="30" cy="80" rx="6" ry="4" fill="#ff5c96" opacity="0.6"/>
+</svg>
