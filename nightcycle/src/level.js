@@ -62,7 +62,7 @@ export const DOORS = {
 };
 
 // How each kind of furniture behaves. solid: blocks the robot over its whole footprint.
-// legs: only its four legs block the robot; clear is the gap underneath.
+// legs: only its four legs block the robot; clear is the gap underneath; leg: [size, inset] of those legs.
 // cover: the robot is hidden while under it. los: tall enough to block sight. h: height, which also decides
 // whether it hides a robot tucked right behind it (World.losLow).
 export const FTYPES = {
@@ -71,8 +71,8 @@ export const FTYPES = {
   armchair:    { solid: true, h: 0.9 },
   sofa:        { legs: true, clear: 0.14, cover: true, h: 0.85 },
   coffeeTable: { legs: true, clear: 0.36, cover: true, h: 0.42 },
-  table:       { legs: true, clear: 0.7, cover: true, h: 0.76 },
-  chair:       { legs: true, clear: 0.42, h: 0.9 },
+  table:       { legs: true, clear: 0.7, cover: true, h: 0.76, leg: [0.06, 0.05] },
+  chair:       { legs: true, clear: 0.42, h: 0.9, leg: [0.035, 0.02] },
   tvStand:     { solid: true, h: 0.5 },
   floorLamp:   { solid: true, h: 1.6 },
   plant:       { solid: true, h: 1.1 },
@@ -83,13 +83,13 @@ export const FTYPES = {
   clock:       { solid: true, h: 2.0, los: true },
   bench:       { legs: true, clear: 0.14, cover: true, h: 0.46 },
   coatRack:    { solid: true, h: 1.8 },
-  tub:         { legs: true, clear: 0.16, cover: true, h: 0.62 },   // clawfoot
+  tub:         { legs: true, clear: 0.16, cover: true, h: 0.62, leg: [0.1, 0.09] },   // clawfoot
   toilet:      { solid: true, h: 0.75 },
   sink:        { solid: true, h: 0.85 },
   kidBed:      { legs: true, clear: 0.24, cover: true, h: 0.55 },
-  bed:         { legs: true, clear: 0.27, cover: true, h: 0.6 },
+  bed:         { legs: true, clear: 0.27, cover: true, h: 0.6, leg: [0.06, 0.03] },
   toyChest:    { solid: true, h: 0.5 },
-  desk:        { legs: true, clear: 0.68, h: 0.72 },
+  desk:        { legs: true, clear: 0.68, h: 0.72, leg: [0.04, 0.02] },
   nightstand:  { solid: true, h: 0.55 },
   wardrobe:    { solid: true, h: 2.0, los: true },
   dresser:     { solid: true, h: 0.85 },
@@ -116,9 +116,9 @@ export const FURNITURE = [
   { type: 'boxes', x0: 5.2, z0: 4.2, x1: 5.8, z1: 4.8, stack: 1, text: 'LIVING RM' },
 
   // Kitchen
-  { type: 'counter', x0: 6.06, z0: 0.06, x1: 9.4, z1: 0.66, facing: 's' },
-  { type: 'counter', x0: 10.5, z0: 0.06, x1: 10.94, z1: 0.66, facing: 's' },
-  { type: 'counter', x0: 10.34, z0: 0.66, x1: 10.94, z1: 3.0, facing: 'w' },
+  { type: 'counter', x0: 6.06, z0: 0.06, x1: 9.4, z1: 0.66, facing: 's', sink: 0.07, stove: -1.2, uppers: [[-1.67, -0.76], [0.9, 1.67]] },
+  { type: 'counter', x0: 10.5, z0: 0.06, x1: 10.94, z1: 0.66, facing: 's', uppers: [[-0.22, 0.22]] },
+  { type: 'counter', x0: 10.34, z0: 0.66, x1: 10.94, z1: 3.0, facing: 'w', uppers: [[-1.17, 1.17]] },
   { type: 'fridge', x0: 10.2, z0: 3.2, x1: 10.94, z1: 3.95, facing: 'w', label: 'refrigerator' },
   { type: 'table', x0: 7.3, z0: 2.2, x1: 8.7, z1: 3.2, label: 'dining table' },
   { type: 'chair', x0: 7.75, z0: 1.72, x1: 8.2, z1: 2.17, facing: 's', label: 'chair' },
@@ -136,7 +136,7 @@ export const FURNITURE = [
   { type: 'clothes', x0: 11.15, z0: 1.7, x1: 12.3, z1: 3.1, label: 'clothes' },
 
   // Hallway
-  { type: 'rug', x0: 1.0, z0: 5.45, x1: 12.6, z1: 6.05, color: '#3b2f4a' },
+  { type: 'rug', x0: 1.0, z0: 5.45, x1: 12.6, z1: 6.05, color: '#3b2f4a', runner: true },
   { type: 'coatRack', x0: 0.25, z0: 5.08, x1: 0.6, z1: 5.42, label: 'coat rack' },
   { type: 'clock', x0: 7.0, z0: 5.06, x1: 7.45, z1: 5.45, facing: 's', label: 'clock' },
   { type: 'bench', x0: 10.5, z0: 5.07, x1: 11.7, z1: 5.52, facing: 's', label: 'bench' },

@@ -34,9 +34,10 @@ void main() {
 
 const FINAL = /* glsl */ `
 precision highp float;
-uniform sampler2D tScene, tBloomA, tBloomB;
+uniform sampler2D tScene, tBloomA, tBloomB, tDirt;
 uniform vec2 res, screen;
 uniform float time, exposure, glitch, staticAmt, fade, danger, distort, grain, retro, bloom;
+uniform float interf, blurX, pulse, desat, zoom, dropout;
 varying vec2 vUv;
 
 float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -53,27 +54,52 @@ float bayer4(vec2 p) {
   return m[idx] / 16.0;
 }
 
+vec3 sampleScene(vec2 px, vec2 c, float ca) {
+  return vec3(texture2D(tScene, px + c * ca).r, texture2D(tScene, px).g, texture2D(tScene, px - c * ca).b);
+}
+
 void main() {
-  vec2 c = vUv - 0.5;
+  vec2 c = (vUv - 0.5) * (1.0 - zoom);
   float r2 = dot(c, c);
-  vec2 uv = 0.5 + c * (1.0 + distort * r2);
+  vec2 uv = 0.5 + c * (1.0 + (distort + pulse * 0.07) * r2);
+  float tick = floor(time * 30.0);
+
+  // Signal interference near the thing: lines tearing sideways, a band rolling up the picture, the frame hopping.
+  float band = 0.0;
+  if (interf > 0.0) {
+    float row = floor(uv.y * 150.0);
+    float tear = step(1.0 - interf * interf * 0.28, hash(vec2(row, tick)));
+    uv.x += tear * (hash(vec2(row * 1.7, tick + 3.0)) - 0.5) * 0.07 * interf;
+    float b = fract(uv.y * 0.55 - time * 0.21);
+    band = smoothstep(0.0, 0.05, b) * smoothstep(0.16, 0.06, b) * interf;
+    uv.x += band * sin(uv.y * 320.0 + time * 45.0) * 0.004;
+    if (hash(vec2(tick, 7.0)) < interf * interf * 0.06) uv.y += (hash(vec2(tick, 9.0)) - 0.5) * 0.05;
+  }
 
   if (glitch > 0.0) {
-    float band = floor(uv.y * 48.0);
-    float n = hash(vec2(band, floor(time * 24.0)));
-    if (n < glitch * 0.35) uv.x += (hash(vec2(band, time)) - 0.5) * 0.12 * glitch;
+    float gb = floor(uv.y * 48.0);
+    float n = hash(vec2(gb, floor(time * 24.0)));
+    if (n < glitch * 0.35) uv.x += (hash(vec2(gb, time)) - 0.5) * 0.12 * glitch;
   }
 
   vec2 px = retro > 0.5 ? (floor(uv * res) + 0.5) / res : uv;
-  float ca = (retro > 0.5 ? 0.0012 : 0.0006) + r2 * 0.005 + glitch * 0.012;
+  float ca = (retro > 0.5 ? 0.0012 : 0.0006) + r2 * 0.005 + glitch * 0.012 + interf * 0.006 + pulse * 0.003;
   vec3 col;
-  col.r = texture2D(tScene, px + c * ca).r;
-  col.g = texture2D(tScene, px).g;
-  col.b = texture2D(tScene, px - c * ca).b;
-  col += (texture2D(tBloomA, uv).rgb * 0.6 + texture2D(tBloomB, uv).rgb * 0.9) * bloom;
+  if (abs(blurX) > 0.0004) {
+    // a fast turn smears the picture sideways (the sensor's rolling readout)
+    col = vec3(0.0);
+    for (int i = -3; i <= 3; i++) col += sampleScene(px + vec2(float(i) * blurX / 3.0, 0.0), c, ca);
+    col /= 7.0;
+  } else col = sampleScene(px, c, ca);
+  // bloom, smeared by the grime on the lens
+  float dirt = texture2D(tDirt, vUv).r;
+  col += (texture2D(tBloomA, uv).rgb * 0.6 + texture2D(tBloomB, uv).rgb * 0.9) * bloom * (0.7 + dirt * 1.4);
 
   col = aces(col * exposure);
   col = pow(col, vec3(1.0 / 2.2));
+  col = mix(col, vec3(dot(col, vec3(0.299, 0.587, 0.114))), desat);
+  // the rolling band is brighter and noisy
+  col += band * (0.05 + 0.12 * hash(floor(uv * screen * 0.5) + tick));
 
   // grain: per low-res pixel in retro, per screen pixel (and finer) in HD
   vec2 gp = retro > 0.5 ? floor(uv * res) : floor(uv * screen);
@@ -82,8 +108,8 @@ void main() {
   if (retro > 0.5) col *= 0.93 + 0.07 * sin(uv.y * res.y * 3.14159);
   else col *= 0.985 + 0.015 * sin(uv.y * screen.y * 1.2 + time * 2.0);
 
-  float vig = smoothstep(0.95, 0.25, length(c * vec2(1.1, 1.0)) * 1.25);
-  col *= mix(0.25, 1.0, vig);
+  float vig = smoothstep(0.95, 0.25, length(c * vec2(1.1, 1.0)) * (1.25 + pulse * 0.45));
+  col *= mix(0.25 - pulse * 0.15, 1.0, vig);
   col = mix(col, col * vec3(1.0, 0.35, 0.3) + vec3(0.12, 0.0, 0.0) * (1.0 - vig), danger * (1.0 - vig * 0.85));
 
   if (retro > 0.5) {
@@ -92,12 +118,36 @@ void main() {
   }
 
   float s = hash(floor(uv * (retro > 0.5 ? res : screen * 0.5)) * 1.7 + vec2(t, t * 0.37));
-  col = mix(col, vec3(s), staticAmt);
+  col = mix(col, vec3(s), staticAmt + interf * interf * 0.1);
+  col *= 1.0 - dropout;   // the feed drops out for a frame
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) col = vec3(0.0);
   col *= 1.0 - fade;
   gl_FragColor = vec4(col, 1.0);
 }
 `;
+
+// Grime on the lens: smudges, a thumbprint and specks. Only shows where bright light blooms across it.
+function lensDirt() {
+  const W = 320, H = 180, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  let a = 31;
+  const r = () => { a = (a * 16807) % 2147483647; return a / 2147483647; };
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  g.filter = 'blur(6px)';
+  for (let i = 0; i < 14; i++) {
+    g.fillStyle = `rgba(255,255,255,${0.08 + r() * 0.18})`;
+    g.beginPath(); g.ellipse(r() * W, r() * H, 10 + r() * 40, 6 + r() * 22, r() * 3, 0, 7); g.fill();
+  }
+  g.filter = 'blur(1.2px)';
+  // a thumbprint, low left, where someone carried it
+  g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1.2;
+  for (let k = 0; k < 9; k++) { g.beginPath(); g.ellipse(62, 132, 6 + k * 3.2, 8 + k * 4, 0.5, 0.3, 5.6); g.stroke(); }
+  g.filter = 'none';
+  for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(255,255,255,${0.2 + r() * 0.6})`; g.beginPath(); g.arc(r() * W, r() * H, 0.4 + r() * 1.4, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c);
+  return t;
+}
 
 function quad(frag, uniforms) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false }));
@@ -121,6 +171,8 @@ export class Post {
       time: { value: 0 }, exposure: { value: 1 }, glitch: { value: 0 }, staticAmt: { value: 0 },
       fade: { value: 0 }, danger: { value: 0 }, distort: { value: 0.1 }, grain: { value: 0.045 },
       retro: { value: 0 }, bloom: { value: 1 },
+      interf: { value: 0 }, blurX: { value: 0 }, pulse: { value: 0 }, desat: { value: 0 }, zoom: { value: 0 }, dropout: { value: 0 },
+      tDirt: { value: lensDirt() },
     };
     this.final = quad(FINAL, this.uniforms);
     this.brightU = { tSrc: { value: this.target.texture }, threshold: { value: 0.9 } };

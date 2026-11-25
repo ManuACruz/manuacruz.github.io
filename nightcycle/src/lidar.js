@@ -78,6 +78,7 @@ export class Lidar {
     }
     const nb = boxes.length / 6;
     const spheres = g.entity.scanSpheres();
+    const ghost = g.tension?.ghostSpheres(o) || [];   // someone who is not there
     let sawIt = false;
 
     // One ray: nearest hit against the floor, ceiling, boxes and the thing's body. Adds a point.
@@ -105,14 +106,24 @@ export class Lidar {
         const th = tc - Math.sqrt(s.r * s.r - d2);
         if (th < tMin) { tMin = th; ent = true; }
       }
-      if (tMin >= T.scanRange || (onlyEntity && !ent)) return;
+      let spook = false;
+      for (const s of ghost) {
+        const lx = s.x - o.x, ly = s.y - o.y, lz = s.z - o.z;
+        const tc = lx * dx + ly * dy + lz * dz;
+        if (tc < 0) continue;
+        const d2 = lx * lx + ly * ly + lz * lz - tc * tc;
+        if (d2 > s.r * s.r) continue;
+        const th = tc - Math.sqrt(s.r * s.r - d2);
+        if (th < tMin) { tMin = th; ent = false; spook = true; }
+      }
+      if (tMin >= T.scanRange || (onlyEntity && !ent && !spook)) return;
       if (ent) sawIt = true;
       const t = tMin - 0.015;
       const i = this.head;
       this.head = (this.head + 1) % CAP;
       this.pos[i * 3] = o.x + dx * t; this.pos[i * 3 + 1] = o.y + dy * t; this.pos[i * 3 + 2] = o.z + dz * t;
       const f = 1 - Math.min(1, t / T.scanRange);
-      if (ent) { this.col[i * 3] = 1.0; this.col[i * 3 + 1] = 0.12; this.col[i * 3 + 2] = 0.08; }
+      if (ent || spook) { this.col[i * 3] = 1.0; this.col[i * 3 + 1] = 0.12; this.col[i * 3 + 2] = 0.08; }
       else { this.col[i * 3] = 0.15 * f; this.col[i * 3 + 1] = 0.35 + 0.65 * f; this.col[i * 3 + 2] = 0.3 + 0.5 * f; }
       this.born[i] = now + t / T.scanWaveSpeed;
     };
@@ -127,8 +138,8 @@ export class Lidar {
       }
     }
     // Motion lock: extra rays at its body so the silhouette reads, still blocked by walls.
-    for (const s of spheres) {
-      for (let k = 0; k < lock; k++) {
+    for (const s of [...spheres, ...ghost]) {
+      for (let k = 0; k < (s.ghost ? lock * 3 : lock); k++) {
         let dx = s.x + (Math.random() - 0.5) * s.r * 2 - o.x, dy = s.y + (Math.random() - 0.5) * s.r * 2 - o.y, dz = s.z + (Math.random() - 0.5) * s.r * 2 - o.z;
         const L = Math.hypot(dx, dy, dz);
         if (L > T.scanRange) break;

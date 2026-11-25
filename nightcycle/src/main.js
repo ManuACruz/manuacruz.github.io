@@ -12,6 +12,8 @@ import { Roomba } from './roomba.js';
 import { Entity } from './entity.js';
 import { Lidar } from './lidar.js';
 import { Motes } from './motes.js';
+import { FX } from './fx.js';
+import { Tension } from './tension.js';
 import { setTextureQuality } from './textures.js';
 import { Audio } from './audio.js';
 import { Hud } from './hud.js';
@@ -68,6 +70,8 @@ function boot() {
   game.entity = new Entity(game);
   game.lidar = new Lidar(game);
   game.motes = new Motes(game);
+  game.fx = new FX(game);
+  game.tension = new Tension(game);
   game.hud = new Hud(game);
   game.story = new Story(game);
 
@@ -83,6 +87,19 @@ function boot() {
     document.body.classList.add('debug');
     game.drive = (throttle, steer, secs) => { game.input.override = { throttle, steer, secs, until: performance.now() + secs * 1000 }; };
     game.place = (x, z, yawDeg = 0) => { Object.assign(game.roomba, { x, z, yaw: (yawDeg * Math.PI) / 180, v: 0 }); };
+    // Art checks: freeze the game and look from a free camera, optionally floodlit and without fog.
+    game.look = (x, y, z, tx, ty, tz, flood = true) => {
+      const g = game;
+      g.state = 'inspect';
+      g.scene.attach(g.camera);
+      g.camera.position.set(x, y, z); g.camera.lookAt(tx, ty, tz);
+      g.flood ||= new THREE.HemisphereLight(0xffffff, 0x888888, 2.2);
+      if (flood) g.scene.add(g.flood); else g.scene.remove(g.flood);
+      g.scene.fog.density = flood ? 0.01 : 0.085;
+      for (const k of ['interf', 'pulse', 'zoom', 'blurX', 'dropout']) g.post.uniforms[k].value = 0;
+      g.hud.show(false);
+      g.post.render(g.scene, g.camera, g.time);
+    };
     if (new URLSearchParams(location.search).has('auto')) startGame();
   }
   let last = performance.now();
@@ -168,6 +185,8 @@ function tick(dt, render = true) {
   g.lampFlicker = Math.max(0, g.lampFlicker - dt);
   updateCinematic(dt);
   effects(dt);
+  g.tension.update(dt);
+  g.fx.update(dt);
   g.lidar.update();
   g.motes.update();
   g.audio.update(dt);
@@ -202,6 +221,7 @@ function watchEntity() {
   if (!g.roomba.light && d > 3 && g.time - g.lidar.lastScan > 3) return;
   lastSight = g.time;
   g.audio.hush(1.5);
+  g.tension.firstSight();
 }
 
 // ---------- hooks the systems call ----------
@@ -242,6 +262,7 @@ game.onEntityScanned = () => game.hud.log('LIDAR: unclassified shape');
 game.onEnterLair = () => {
   game.setDoor('laundry', 'closed', 2.5);
   game.audio.doorSlam(PLACES.laundryDoor[0], PLACES.laundryDoor[2], 0.9);
+  game.fx.sift(PLACES.laundryDoor[0], 2.08, PLACES.laundryDoor[2] + 0.1, 26, 0.4);
   game.hud.log('Door closed: Laundry');
 };
 game.onLeaveLair = () => {
@@ -251,6 +272,7 @@ game.onLeaveLair = () => {
 game.onEntityStep = (x, z, dx, dz, left) => {
   const g = game;
   if (g.mudOn && g.world.roomAt(x, z) === g.world.roomIndex('hall')) g.mudQueue.push({ x, z, dx, dz, left, t: g.time + 3 });
+  g.tension.footfall(x, z, Math.min(1, Math.max(0.35, g.entity.speed / 1.7)));
 };
 // Its muddy feet undo your cleaning, a few seconds behind it.
 function updateMud() {
@@ -440,7 +462,7 @@ function effects(dt) {
   // nightlights short out when it walks past
   const e = g.entity;
   h.nightlights.forEach((n, i) => {
-    if (n.alive && e.root.visible && e.state !== 'scare' && Math.hypot(e.x - n.x, e.z - n.z) < 0.75) { n.alive = false; n.dying = 0.7; f.nightlights[i] = false; g.audio.pop(n.x, 0.3, n.z); }
+    if (n.alive && e.root.visible && e.state !== 'scare' && Math.hypot(e.x - n.x, e.z - n.z) < 0.75) { n.alive = false; n.dying = 0.7; f.nightlights[i] = false; g.audio.pop(n.x, 0.3, n.z); g.fx.sparksAt(n.x, 0.3, n.z); }
     if (n.dying > 0) {
       n.dying -= dt;
       setNightlight(n, n.dying > 0 ? (flash ? (Math.random() < 0.5 ? 1 : 0.1) : n.dying / 0.7) : 0);
@@ -492,6 +514,8 @@ function restore(cp, keepFloor = false) {
   g.mudQueue = [];
   g.lair = { cool: 0, session: 0, next: 0, last: -100, bumps: [] };
   g.incidents = [];
+  g.fx.clear();
+  g.tension.reset();
   resetView();
 }
 

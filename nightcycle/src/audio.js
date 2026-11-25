@@ -431,6 +431,90 @@ export class Audio {
     n.start(t); n.stop(t + dur + 0.2);
   }
 
+  // A locked door's handle tried from the other side: a fast metallic chatter.
+  rattle(x, z, dur = 1.1) {
+    this.cap('a door handle rattles', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, 1, z, { verb: 0.6 });
+    for (let tt = 0; tt < dur; tt += 0.045 + Math.random() * 0.05) {
+      const n = this.noise(), bp = this.filter('bandpass', 2200 + Math.random() * 1800, 9), g = this.gain();
+      n.connect(bp).connect(g).connect(dest);
+      this.env(g, t + tt, 0.001, 0.22 + Math.random() * 0.2, 0.03);
+      n.start(t + tt, Math.random()); n.stop(t + tt + 0.05);
+      if (Math.random() < 0.3) {
+        const o = this.osc('sine', 120), og = this.gain();
+        o.connect(og).connect(dest);
+        this.env(og, t + tt, 0.002, 0.25, 0.05);
+        o.start(t + tt); o.stop(t + tt + 0.08);
+      }
+    }
+  }
+
+  // Something heavy dropping in the roof space.
+  thump(x, y, z, v = 1) {
+    this.cap('a thump overhead', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, y, z, { verb: 0.9, occlude: false });
+    const o = this.osc('sine', 62), g = this.gain(), lp = this.filter('lowpass', 260);
+    o.frequency.exponentialRampToValueAtTime(30, t + 0.35);
+    o.connect(lp).connect(g).connect(dest);
+    this.env(g, t, 0.004, 1.3 * v, 0.45);
+    o.start(t); o.stop(t + 0.6);
+    const n = this.noise(this.brown), ng = this.gain();
+    n.connect(ng).connect(dest);
+    this.env(ng, t, 0.003, 0.7 * v, 0.3);
+    n.start(t); n.stop(t + 0.5);
+  }
+
+  // Furniture dragged slowly across a floor, far off.
+  drag(x, z, dur = 2.2) {
+    this.cap('something heavy dragged', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, 0.2, z, { verb: 0.8 });
+    const n = this.noise(this.brown, true), bp = this.filter('bandpass', 320, 2.5), g = this.gain();
+    const am = this.osc('sawtooth', 23), ag = this.gain(0.5);
+    am.connect(ag).connect(g.gain);
+    n.connect(bp).connect(g).connect(dest);
+    bp.frequency.setValueCurveAtTime(new Float32Array([260, 340, 300, 380, 280, 330]), t, dur);
+    this.env(g, t, 0.15, 0.9, dur * 0.4, dur * 0.5);
+    n.start(t); am.start(t); n.stop(t + dur + 0.2); am.stop(t + dur + 0.2);
+  }
+
+  // A low pressure throb in the robot's own housing as the danger climbs. Not positional.
+  pulse(v = 1) {
+    if (!this.ctx) return;
+    const t = this.now(), o = this.osc('sine', 52), g = this.gain(), lp = this.filter('lowpass', 140);
+    o.frequency.exponentialRampToValueAtTime(34, t + 0.16);
+    o.connect(lp).connect(g).connect(this.sfx);
+    this.env(g, t, 0.006, 0.55 * v, 0.18);
+    o.start(t); o.stop(t + 0.3);
+  }
+
+  // Mains buzz from a light that is about to go.
+  buzz(x, y, z, dur = 1.2, v = 1) {
+    this.cap('electrical buzzing', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, y, z, { verb: 0.3 });
+    const o = this.osc('sawtooth', 100), bp = this.filter('bandpass', 600, 2), g = this.gain();
+    o.connect(bp).connect(g).connect(dest);
+    const curve = new Float32Array(24).map(() => (Math.random() < 0.35 ? 0.0001 : 0.06 * v));
+    g.gain.setValueCurveAtTime(curve, t, dur);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  // Interference crackle on the robot's audio as the thing gets close.
+  crackle(v = 1) {
+    if (!this.ctx) return;
+    const t = this.now();
+    for (let k = 0; k < 3; k++) {
+      const tt = t + Math.random() * 0.06;
+      const n = this.noise(), hp = this.filter('highpass', 1500 + Math.random() * 4000), g = this.gain();
+      n.connect(hp).connect(g).connect(this.sfx);
+      this.env(g, tt, 0.001, 0.05 * v, 0.02 + Math.random() * 0.04);
+      n.start(tt, Math.random()); n.stop(tt + 0.08);
+    }
+  }
+
   stinger() {
     if (!this.ctx) return;
     const t = this.now(), lp = this.filter('lowpass', 500), g = this.gain();

@@ -77,17 +77,20 @@ onto the green light of the dock (where you start) to charge and empty it.
 | `src/level.js` | the house as data: rooms, walls and openings, doors, furniture, items, footprint path, lights |
 | `src/world.js` | DOM-free rules: collision, sight lines, the entity's walking grid and A*, dirt grid |
 | `src/build.js` | builds the three.js scene from the level data (furniture builders live here) |
+| `src/props.js` | geometry for soft props: rounded boxes, draped dust sheets, cloth heaps, turned and bent shapes |
 | `src/textures.js` | procedural canvas textures (floors, wallpaper, dust, footprints, the crayon drawing...) |
 | `src/roomba.js` | the player robot: driving, bumping, cleaning, battery, bin, dock, headlamp, camera |
 | `src/entity.js` | the thing's mind: senses, patrol / investigate / chase / search, stop-motion timing |
 | `src/longman.js` | the thing's body: model, poses, eye-shine, the split-open head of the scare |
 | `src/motes.js` | dust in the air, lit only inside the headlamp beam |
+| `src/fx.js` | particles: the black smoke off the Long Man, dust puffs and grit, sparks |
+| `src/tension.js` | interference and the pulse near it, footstep shake, flickering lights, quiet-time events |
 | `src/story.js` | Night 1: tasks and scripted events as generator coroutines, and the ending |
 | `src/dirt.js`, `src/items.js`, `src/lidar.js` | dirt film, footprints and its muddy prints, floor items, LIDAR points |
 | `src/kibble.js` | the dog food trail and spill (a spot-clean task that crunches) |
 | `src/audio.js` | all sound, synthesised with Web Audio (no audio files) |
 | `src/hud.js` | status, task, cleaning map, notifications, object-recognition boxes, dirt markers |
-| `src/post.js` | low-res render plus the camera shader (bulge, grain, dither, glitch, static) |
+| `src/post.js` | the camera shader (bulge, grain, dither, glitch, static, interference, smear, lens dirt) |
 | `src/main.js` | boot, loop, states, checkpoints, ending, debug keys |
 | `tools/check.mjs` | level checker: `node tools/check.mjs` (add `--map` for an ASCII reachability map) |
 
@@ -97,11 +100,12 @@ Open `http://localhost:8083/?debug`. Keys: `1`-`7` jump to a task, `C` clean the
 `T` teleport into it, `G` ghost (it can't see or catch you), `B` infinite battery, `K` get caught.
 `?debug&auto` skips the title. In the console, `NC` is the game; `NC.advance(seconds)` runs the simulation
 forward without waiting for frames, `NC.drive(throttle, steer, seconds)` drives, `NC.place(x, z, yawDegrees)`
-teleports.
+teleports, `NC.look(x, y, z, tx, ty, tz, flood)` freezes the game and looks from a free camera (floodlit by default),
+for checking art.
 
 ## Notes
 
-- Everything is generated: geometry from boxes and capsules, textures on canvases, sound from oscillators and
+- Everything is generated: geometry from boxes, lathes, extrusions and draped grids, textures on canvases, sound from oscillators and
   noise. The only external request is the Google Fonts stylesheet (VT323, Inter), which falls back to
   system fonts offline.
 - Settings (difficulty, camera, volume, brightness, look sensitivity, text size, robot voice, object

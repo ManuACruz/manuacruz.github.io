@@ -11,6 +11,8 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const rand = (a, b) => a + Math.random() * (b - a);
 const wrapAngle = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
 
+const ARM_IN = -1;   // sign of a shoulder z-turn that brings the arm on `side` in toward the body
+
 const NOISE_LABEL = { suction: 'Suction', bump: 'Collision', drive: 'Motor', scan: 'LIDAR ping', voice: 'Voice prompt', crunch: 'Crunching', dock: 'Docking chime' };
 
 export class Entity {
@@ -573,6 +575,28 @@ export class Entity {
       phase: this.phase, walk, chase: this.state === 'chase', duck: this.duck, time: g.time,
       look: { yaw, pitch, roll: onYou ? this.twitchRoll * 0.4 : this.twitchRoll },
     });
+    this.keepArmsIn();
+  }
+
+  // Its arms hang wide of its body. Beside a wall or a door, the arm on that side folds in instead of
+  // passing through.
+  keepArmsIn() {
+    const w = this.game.world, j = this.j, v = this._hand;
+    this.root.updateMatrixWorld(true);
+    for (const [A, side] of [[j.armL, -1], [j.armR, 1]]) {
+      for (let it = 0; it < 5; it++) {
+        let worst = 0;
+        for (const b of [A.el, A.wr, A.fingers[1][1], A.fingers[1][2]]) {
+          b.getWorldPosition(v);
+          worst = Math.max(worst, w.wallPen(v.x, v.y, v.z, 0.06));
+        }
+        if (worst <= 0.002) break;
+        A.sh.rotation.z += side * ARM_IN * Math.min(0.3, 0.08 + worst * 2.5);
+        A.el.rotation.x -= 0.1;
+        A.wr.rotation.x -= 0.06;
+        A.sh.updateMatrixWorld(true);
+      }
+    }
   }
 
   layoutNeck() { this.body.layoutNeck(); }
@@ -584,8 +608,24 @@ export class Entity {
     this.state = 'scare';
     this.scareT = 0;
     this.root.visible = true;
-    // stand right in front of the robot, facing it
-    this.x = r.x + r.fx * 0.75; this.z = r.z + r.fz * 0.75;
+    // Right in front of the lens, facing it. If a wall or furniture is in the way it is beside you, or behind
+    // you, and the camera whips round to it.
+    const w = g.world, base = Math.atan2(r.fx, r.fz);
+    const clear = (x, z) => w.wallPen(x, 0.4, z, 0.3) === 0 && w.wallPen(x, 1.3, z, 0.32) === 0 && w.wallPen(x, 2.1, z, 0.28) === 0 && w.los(r.x, r.z, x, z);
+    let spot = null;
+    for (const strict of [true, false]) {
+      for (const da of [0, 0.45, -0.45, 0.9, -0.9, 1.5, -1.5, 2.2, -2.2, Math.PI]) {
+        for (const dist of [0.75, 0.62, 0.9]) {
+          const a = base + da, x = r.x + Math.sin(a) * dist, z = r.z + Math.cos(a) * dist;
+          if (clear(x, z) && (!strict || w.navFree(x, z))) { spot = { x, z, da }; break; }
+        }
+        if (spot) break;
+      }
+      if (spot) break;
+    }
+    spot = spot || { x: r.x + r.fx * 0.75, z: r.z + r.fz * 0.75, da: 0 };
+    this.x = spot.x; this.z = spot.z;
+    this.scareTurn = spot.da; this.scareYaw0 = r.yaw; this.scareSmoke = false;
     this.yaw = Math.atan2(r.x - this.x, r.z - this.z);
     this.speed = 0;
     this.body.resetPose();
@@ -594,13 +634,24 @@ export class Entity {
   }
 
   updateScare(dt) {
+    const g = this.game, r = g.roomba;
     this.scareT += dt;
+    if (this.scareTurn) {   // the whip-pan round to where it is
+      const k = Math.min(1, this.scareT / 0.22);
+      r.yaw = this.scareYaw0 + this.scareTurn * (1 - (1 - k) ** 3);
+      r.updateRig(0, g.time);
+    }
     this.root.position.set(this.x, 0, this.z);
     this.root.rotation.y = this.yaw;
     const cam = new THREE.Vector3(), fwd = new THREE.Vector3();
-    this.game.camera.getWorldPosition(cam);
-    this.game.camera.getWorldDirection(fwd);
+    g.camera.getWorldPosition(cam);
+    g.camera.getWorldDirection(fwd);
     this.body.scare(this.scareT, cam, fwd);   // it crouches, the neck stretches to the lens, the head splits open
+    if (!this.scareSmoke && this.scareT > 0.18) {   // and the smoke comes off it all at once
+      this.scareSmoke = true;
+      const c = this.j.chest.getWorldPosition(new THREE.Vector3()).lerp(cam, 0.45);
+      g.fx?.burst(c.x, c.y, c.z, 36, 0.5);
+    }
   }
 
   // Eye-shine against the headlamp, every frame (not stop-motion).

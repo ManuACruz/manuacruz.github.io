@@ -43,6 +43,31 @@ of spit between the halves that stretch as it opens and snap one by one. The sho
 bony point with the deltoid capping the arm and folds into the armpit; the knees have a flat kneecap, knobs either
 side, the tendon and the hollow behind, and the joint weights differ front and back so a bent knee keeps its shape.
 
+Black smoke pours off it (`src/fx.js`): a low pool round its feet that hides where it meets the floor, wisps
+curling up its shins, and a trail off its back and arms while it hunts; it bursts off it as it comes for the lens.
+Beside a wall or a shut door the arm on that side folds in rather than pass through (`Entity.keepArmsIn`). When it
+catches you it stands on open floor, not inside a wall: if there is no room in front, the camera whips round to
+where it is.
+
+## Tension (built)
+
+What the robot's camera and the house do as it gets close (`src/tension.js`, `src/post.js`):
+
+- **Interference** inside ~4.5 m, through walls (it is electrical): lines of the picture tear sideways, a bright
+  band rolls up the frame, the frame hops, the feed drops out for a frame; the headlamp stutters and the audio
+  crackles. It is the one warning that works through walls without the HUD.
+- **A pulse**: the picture throbs (tighter vignette, a bulge, more fringing) with a low thump in the housing,
+  faster as it closes in on a hidden robot, during a chase and while it reaches.
+- **Its footsteps** shake the camera with distance, and sift grit off the underside of whatever you hide under.
+- **Lights near it** (floor lamp, TV, fridge, Theo's nightlight) stutter and buzz; nightlights short out in sparks.
+- **First sight** pulls focus for a moment; a fast turn smears the picture; a dying battery drains the colour.
+- **Quiet time**: after a calm stretch (it is far or away, ~40 to 70 s apart) one small thing happens: a locked
+  outside door's handle rattles, something heavy is dragged in a far room, knocks travel inside the nearest wall
+  toward you, a thump in the roof sifts dust through your light, a tall shape walks past a moonlit window (its
+  shadow slides across the moonlight on the floor), or, once a night before it is out, the next LIDAR scan shows
+  someone standing in a doorway in red, and the scan after shows nobody.
+All of it respects the "flashing effects" setting (gentler, no strobing or dropouts).
+
 ## Core loop (built)
 
 - **Tasks**: clean a room to a dirt-removed target (65%; hallway 60%), spot-clean footprints, return to base.
@@ -113,13 +138,26 @@ with plywood, light bleeding round it (after it gets out, the bottom bolt hangs 
 the floor). A chain on the outside of Theo's door, ripped from the jamb. On the wall under Theo's bed, at robot
 height: "UNDER HERE HE CANT REACH" and the nights, counted. A kibble trail from the bowl to the laundry door.
 Grey scuffs on the tops of the door frames. The hall smoke alarm dangling on its wires, still blinking. Biscuit's
-leash clipped to the coat rack, the collar end empty. Claw gouges low on the back door.
+leash clipped to the coat rack, the collar end empty. Claw gouges low on the back door. In the laundry: a hole torn
+low in the wall beside the washing machines, chunks of plasterboard on the floor, long dark drags down the walls,
+and a nest of torn clothes pressed flat in the middle.
+
+The house is low-poly with no assets loaded, but nothing is a bare primitive: dust sheets are draped cloth
+(`drapeGeo` in `src/props.js`: the shape underneath shows through, folds, drooping corners), the bathroom has a
+turned toilet pan, a vanity with a sunk basin and a clawfoot tub with paws, the kitchen has a sink, a cooker and
+wall cupboards, beds have rounded mattresses and a duvet, the shelves are half-packed. Wallpapers are drawn
+motifs (damask, flower sprigs, Theo's bedtime print of moons, planets and rockets), the hall runner repeats along
+its length, and Theo's rug is braided. Rule for new props: no two different surfaces may share a plane (they
+flicker through each other at a distance); window and door frames and skirting boards overlap the cut edges of the
+walls by a few millimetres for that reason. `buildHouse(scene, world, { merge: false })` keeps meshes separate for
+checking this.
 
 ## Known limits of this slice
 
 - Mobile works in principle (touch stick and buttons, low-res rendering) but was only checked at desktop size.
-- Static geometry is merged per material (~170 draw calls for the house); the Long Man is one skinned mesh
-  (~29k vertices) plus a dozen head parts; the door props and mud prints add a few dozen more.
+- Static geometry is merged per material (~170 draw calls for the house, ~190k triangles in all); the Long Man is
+  one skinned mesh (~29k vertices) plus a dozen head parts; the door props and mud prints add a few dozen more.
+  Particles are three instanced pools (one draw call each, about 1,300 particles at most).
 
   HD is fill-rate bound (every light costs every pixel), so lights that are off are removed and HD scales its
   internal resolution down automatically when frames run long.

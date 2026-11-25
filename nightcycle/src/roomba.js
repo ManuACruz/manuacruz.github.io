@@ -170,6 +170,7 @@ export class Roomba {
         this.bumpTimer = T.bumpCooldown;
         this.shake = 0.5 + hard * 0.5;
         g.audio.bump(hard * (0.6 + 0.4 * this.floorNoise));
+        g.fx?.bumpDust(this.x - hit.nx * T.radius, 0.04, this.z - hit.nz * T.radius, hard);
         g.noise(this.x, this.z, T.noiseBump * (0.5 + hard * 0.5) * (0.6 + 0.4 * this.floorNoise), 'bump');
         g.hud.bump();
         g.stats.bumps++;
@@ -278,6 +279,8 @@ export class Roomba {
     const flash = this.game.settings.flashing;
     if (li && this.battery < 10) li *= flash ? (Math.random() < 0.08 ? Math.random() * 0.4 : 1) : 0.75 + 0.25 * Math.sin(time * 3);
     if (this.game.lampFlicker > 0) li *= flash ? (Math.random() < 0.5 ? Math.random() : 1) : 0.45 + 0.35 * Math.sin(time * 4);
+    const itf = this.game.interf || 0;   // the thing close by: the lamp stutters
+    if (li && itf > 0.04) li *= flash ? (Math.random() < itf * 0.3 ? 0.15 + Math.random() * 0.5 : 1 - itf * 0.1) : 1 - itf * 0.3 * (0.5 + 0.5 * Math.sin(time * 11));
     this.lamp.intensity = li;
     this.led.intensity = this.dead ? 0 : this.ledBoost ? 1.2 : 0.03;
     this.led.distance = this.ledBoost ? 3.5 : 0.8;

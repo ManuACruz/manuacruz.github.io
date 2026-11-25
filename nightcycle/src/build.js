@@ -3,7 +3,9 @@
 import * as THREE from 'three';
 import { HOUSE, ROOMS, FURNITURE, LIGHTS, NIGHTLIGHTS } from './level.js';
 import { makeTextures, makeStatic } from './textures.js';
+import { roundBox, drapeGeo, lump, lathe, strip, pipe, stadium, extrudeUp, noise3 } from './props.js';
 
+const OVERLAP = 0.006;   // how far frames reach past the cut edge of a wall
 const TILE = { wood: 1.6, woodDark: 1.6, checker: 1.2, smallTile: 0.8, carpet: 0.5, carpetBlue: 0.5, concrete: 1 };
 const FACING = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 };
 
@@ -19,7 +21,8 @@ export function boxGeo(w, h, d, s = 1, ou = 0, ov = 0) {
   return g;
 }
 
-export function buildHouse(scene, world) {
+// opts.merge = false keeps every mesh separate (for debugging the art).
+export function buildHouse(scene, world, opts = {}) {
   const tx = makeTextures();
   const house = { tx, tags: [], scanMeshes: [], doors: {}, lights: {}, moons: [], flicker: [] };
   const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.85, ...o });
@@ -27,7 +30,32 @@ export function buildHouse(scene, world) {
     wood: std({ map: tx.furnWood, roughness: 0.6 }),
     fabric: std({ map: tx.fabric }),
     fabricBlue: std({ map: tx.fabricBlue }),
-    sheet: std({ map: tx.sheet, roughness: 1 }),
+    sheet: std({ map: tx.sheet, color: 0xb8b2a6, roughness: 1, side: THREE.DoubleSide, shadowSide: THREE.BackSide }),
+    underside: std({ color: 0x2a2420, roughness: 1 }),
+    books: [0x5a2a24, 0x2a3a4a, 0x3a4a2e, 0x6a5a3a, 0x2a2a2e, 0x7a6a50, 0x4a2a3a].map((c) => std({ map: tx.bookSpine, color: c, roughness: 0.8 })),
+    soil: std({ color: 0x2a1e14, roughness: 1 }),
+    plantDry: std({ color: 0x6a5434, roughness: 1, side: THREE.DoubleSide }),
+    steel: std({ color: 0xb8bcc2, metalness: 0.8, roughness: 0.28 }),
+    steelIn: std({ color: 0x8a8e94, metalness: 0.7, roughness: 0.35, side: THREE.BackSide }),
+    ovenGlass: std({ color: 0x08090a, roughness: 0.08, metalness: 0.3 }),
+    hob: std({ color: 0x1a1a1c, roughness: 0.3 }),
+    enamel: std({ color: 0xe8e4da, roughness: 0.25, side: THREE.DoubleSide }),
+    tubFloor: std({ map: tx.tubStain, roughness: 0.3 }),
+    brass: std({ color: 0x9a7a3a, metalness: 0.85, roughness: 0.35 }),
+    porcelain: std({ color: 0xece9e2, roughness: 0.18 }),
+    water: std({ color: 0x3a3426, roughness: 0.05, metalness: 0.2 }),
+    basinIn: std({ color: 0xe2dfd8, roughness: 0.2, side: THREE.BackSide }),
+    duvet: std({ map: tx.duvet, roughness: 1, side: THREE.DoubleSide, shadowSide: THREE.BackSide }),
+    pillow: std({ color: 0xdedad0, roughness: 1 }),
+    fur: std({ map: tx.fur, color: 0x8a6a48, roughness: 1 }),
+    furLight: std({ map: tx.fur, color: 0xc8aa88, roughness: 1 }),
+    mattressBare: std({ map: tx.mattress, roughness: 1 }),
+    redDark: std({ color: 0x4a1612, roughness: 0.7 }),
+    rope: std({ color: 0xb8a070, roughness: 1 }),
+    panel: std({ color: 0xc8c6c0, roughness: 0.4 }),
+    porthole: std({ color: 0x0c0e10, roughness: 0.05, metalness: 0.4 }),
+    rags: [0x2a2e3a, 0x4a3030, 0x3a4a3a, 0x8a8070, 0x1e1e22, 0x5a5a7a].map((c) => std({ map: tx.rag, color: c, roughness: 1 })),
+    fringe: std({ map: tx.fringe, color: 0xcfc0a0, roughness: 1, transparent: true, alphaTest: 0.4 }),
     card: std({ map: tx.cardboard, roughness: 0.95 }),
     white: std({ color: 0xe6e3dc, roughness: 0.3 }),
     paint: std({ color: 0xd8d3c6, roughness: 0.6 }),
@@ -37,7 +65,7 @@ export function buildHouse(scene, world) {
     cabinet: std({ map: tx.furnWood, color: 0x9a8a78, roughness: 0.6 }),
     frame: std({ color: 0xd9d4c7, roughness: 0.5 }),
     door: std({ map: tx.door, roughness: 0.6 }),
-    plantDead: std({ color: 0x4a4a2a, roughness: 1 }),
+    plantDead: std({ color: 0x4a4a2a, roughness: 1, side: THREE.DoubleSide }),
     pot: std({ color: 0x6a3a2a, roughness: 0.9 }),
     mattress: std({ color: 0xb8b2a0, roughness: 1 }),
     red: std({ color: 0x8a2a22, roughness: 0.7 }),
@@ -101,7 +129,8 @@ export function buildHouse(scene, world) {
     }
     if (p.y0 === 0) {  // skirting board
       const bh = 0.09, bt = HOUSE.wallT + 0.024;
-      const bb = new THREE.Mesh(boxGeo(p.along === 'x' ? w : bt, bh, p.along === 'x' ? bt : d, 1), M.frame);
+      // a few mm longer than the wall piece: its end then wraps the wall's cut edge instead of sharing its plane
+      const bb = new THREE.Mesh(boxGeo(p.along === 'x' ? w + 0.006 : bt, bh, p.along === 'x' ? bt : d + 0.006, 1), M.frame);
       bb.position.set(mx, bh / 2, mz);
       bb.receiveShadow = true;
       scene.add(bb);
@@ -128,7 +157,10 @@ export function buildHouse(scene, world) {
     const inward = wi.at === 0 ? 1 : -1;
     const grp = new THREE.Group();
     const ft = 0.05, fd = HOUSE.wallT + 0.02;
-    const parts = [[L + ft * 2, ft, fd, 0, wi.top - cy + ft / 2], [L + ft * 2, ft, fd + 0.06, 0, wi.sill - cy - ft / 2], [ft, H, fd, -L / 2 - ft / 2, 0], [ft, H, fd, L / 2 + ft / 2, 0], [0.035, H, 0.03, 0, 0], [L, 0.035, 0.03, 0, 0]];
+    // The frame lines the opening and overlaps it by OVERLAP: a face lying exactly on the wall's cut edge would z-fight.
+    const e = OVERLAP;
+    const parts = [[L + ft * 2, ft + e, fd, 0, wi.top - cy + (ft - e) / 2], [L + ft * 2, ft + e, fd + 0.06, 0, wi.sill - cy - (ft - e) / 2],
+      [ft + e, H, fd, -L / 2 - (ft - e) / 2, 0], [ft + e, H, fd, L / 2 + (ft - e) / 2, 0], [0.035, H, 0.03, 0, 0], [L, 0.035, 0.03, 0, 0]];
     for (const [w, h, d, x, y] of parts) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M.frame);
       m.position.set(x, y, 0);
@@ -176,7 +208,8 @@ export function buildHouse(scene, world) {
     }
     // frame
     const fr = new THREE.Group();
-    for (const [w, hh, x, y] of [[0.06, h + 0.05, d.from - 0.03, (h + 0.05) / 2], [0.06, h + 0.05, d.to + 0.03, (h + 0.05) / 2], [L + 0.12, 0.06, (d.from + d.to) / 2, h + 0.04]]) {
+    const top = h + 0.01, e = OVERLAP;   // overlap the cut edges of the wall so no face lies on one
+    for (const [w, hh, x, y] of [[0.06 + e, top + 0.04, d.from - (0.06 - e) / 2, (top + 0.04) / 2], [0.06 + e, top + 0.04, d.to + (0.06 - e) / 2, (top + 0.04) / 2], [L + 0.12, 0.06 + e, (d.from + d.to) / 2, top + (0.06 - e) / 2]]) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, HOUSE.wallT + 0.03), M.frame);
       if (d.along === 'x') m.position.set(x, y, d.at); else { m.position.set(d.at, y, x); m.rotation.y = Math.PI / 2; }
       fr.add(m);
@@ -290,7 +323,7 @@ export function buildHouse(scene, world) {
     const f = world.flap, cx = (f.from + f.to) / 2, L = f.to - f.from;
     const frameMat = std({ color: 0xcfc6b0, roughness: 0.5 });
     for (const side of [-1, 1]) {
-      const z = f.at + side * (HOUSE.wallT / 2 + 0.006);
+      const z = f.at + side * (HOUSE.wallT / 2 + 0.0075);   // just proud of the skirting's face
       for (const [w, h, x, y] of [[L + 0.08, 0.04, cx, f.top + 0.02], [0.04, f.top + 0.04, f.from - 0.02, (f.top + 0.04) / 2], [0.04, f.top + 0.04, f.to + 0.02, (f.top + 0.04) / 2]]) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.012), frameMat);
         m.position.set(x, y, z);
@@ -408,6 +441,29 @@ export function buildHouse(scene, world) {
     scene.add(m);
     house.tags.push({ label: 'writing', box: new THREE.Box3().setFromObject(m).expandByScalar(0.02), conf: 0.44, obj: m });
   }
+  // The laundry: where it lives. A hole torn low in the wall beside the washing machines, chunks of
+  // plasterboard on the floor in front of it, and long dark drags down the walls.
+  {
+    const decal = (map, w, h, x, y, z, ry, opts = {}) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map, transparent: true, roughness: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, ...opts }));
+      m.position.set(x, y, z); m.rotation.y = ry;
+      m.userData.noShadow = true;
+      scene.add(m);
+      return m;
+    };
+    decal(tx.hole, 0.8, 0.8, 12.66, 0.4, HOUSE.wallT / 2 + 0.004, 0);
+    const chunk = std({ color: 0xe0dacb, roughness: 1 });
+    for (let k = 0; k < 7; k++) {
+      const s = 0.03 + Math.random() * 0.06;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(s, 0.012, s * (0.6 + Math.random())), chunk);
+      m.position.set(12.45 + Math.random() * 0.5, 0.006, 0.12 + Math.random() * 0.4);
+      m.rotation.set((Math.random() - 0.5) * 0.3, Math.random() * 3, (Math.random() - 0.5) * 0.3);
+      scene.add(m);
+    }
+    decal(tx.smears, 2.2, 1.1, 14 - HOUSE.wallT / 2 - 0.004, 1.65, 2.2, -Math.PI / 2);
+    decal(tx.smears, 1.6, 0.8, 13.2, 1.75, HOUSE.wallT / 2 + 0.004, 0, { opacity: 0.8 });
+    decal(scratchTex(), 0.5, 0.4, 11 + HOUSE.wallT / 2 + 0.004, 0.55, 3.6, Math.PI / 2, { color: 0x2a2420 });
+  }
   // Grey scuffs on the tops of the door frames, at the height of something that has to stoop.
   {
     const mat = new THREE.MeshStandardMaterial({ map: tx.scuff, transparent: true, depthWrite: false, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 });
@@ -510,7 +566,11 @@ export function buildHouse(scene, world) {
     if (isDynamic(m)) house.scanDynamic.push(m);
     else { const b = new THREE.Box3().setFromObject(m); house.scanStatic.push(b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z); }
   }
-  mergeStatic(scene, isDynamic);
+  // shapes only the LIDAR needed (what is under the dust sheets) go now
+  const ghosts = [];
+  scene.traverse((o) => { if (o.userData.scanOnly) ghosts.push(o); });
+  for (const o of ghosts) o.parent.remove(o);
+  if (opts.merge !== false) mergeStatic(scene, isDynamic);
   return house;
 }
 
@@ -609,6 +669,29 @@ function legs(g, w, d, h, mat, s = 0.045, inset = 0.03) {
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]])
     B(g, s, h, s, sx * (w / 2 - inset - s / 2), 0, sz * (d / 2 - inset - s / 2), mat);
 }
+// Any geometry, placed. (y is the mesh origin, not its base.)
+function G(g, geo, mat, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  g.add(m);
+  return m;
+}
+// Rounded box sitting on y.
+function RB(g, w, h, d, r, x, y, z, mat, s = 0.5) { return G(g, roundBox(w, h, d, r, s), mat, x, y + h / 2, z); }
+// A solid only the LIDAR sees (what is under a dust sheet).
+function hidden(g, w, h, d, x, y, z) {
+  const m = B(g, w, h, d, x, y, z, HIDDEN);
+  m.userData.scanOnly = true;
+  return m;
+}
+const HIDDEN = new THREE.MeshBasicMaterial({ color: 0 });
+// A dust sheet over boxes [{x0,x1,z0,z1,h}] in this frame.
+function sheetOver(g, w, d, boxes, M, o) {
+  const m = G(g, drapeGeo(w, d, boxes, o), M.sheet);
+  m.userData.noScan = true;
+  return m;
+}
+const rnd = (() => { let a = 12345; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
 
 const BUILDERS = {
   dock(g, w, d, f, M) {
@@ -620,29 +703,72 @@ const BUILDERS = {
     for (const s of [-1, 1]) B(g, 0.05, 0.004, 0.08, s * 0.08, 0.004, d / 2 + 0.06, M.metal);
     return { dockLed: led };
   },
+  // Half-packed: some shelves still full, some cleared, a stack lying flat, a few leaning.
   bookshelf(g, w, d, f, M) {
     const h = 1.9;
     B(g, 0.03, h, d, -w / 2 + 0.015, 0, 0, M.wood); B(g, 0.03, h, d, w / 2 - 0.015, 0, 0, M.wood);
     B(g, w, h, 0.02, 0, 0, -d / 2 + 0.01, M.wood);
+    B(g, w + 0.02, 0.03, d + 0.02, 0, h - 0.03, 0.005, M.wood);   // top, a lip over the sides
+    B(g, w - 0.06, 0.07, 0.015, 0, 0, d / 2 - 0.0075, M.wood);    // kick plate
     for (let k = 0; k < 6; k++) B(g, w - 0.06, 0.025, d - 0.02, 0, k * 0.37, 0.01, M.wood);
-    const book = (x, y, hh) => B(g, 0.035, hh, 0.22, x, y, 0, new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(Math.random(), 0.4, 0.25), roughness: 0.8 }));
-    for (let k = 0; k < 4; k++) book(-0.4 + k * 0.04, 0.395, 0.22 + Math.random() * 0.06);
-    const fallen = book(0.25, 0.77, 0.25); fallen.rotation.z = 1.2; fallen.position.y = 0.81;
+    const inner = w - 0.07, fill = [0.85, 0.15, 0.7, 0.0, 0.55, 0.35];
+    for (let k = 0; k < 6; k++) {
+      const y = k * 0.37 + 0.025;
+      let x = -inner / 2;
+      const end = -inner / 2 + inner * fill[k];
+      while (x < end - 0.03) {
+        const bw = 0.018 + rnd() * 0.035, bh = 0.17 + rnd() * 0.12, bd = 0.15 + rnd() * 0.07;
+        const b = B(g, bw, bh, bd, x + bw / 2, y, -d / 2 + 0.03 + bd / 2, M.books[(rnd() * M.books.length) | 0]);
+        b.userData.noScan = true;
+        x += bw + 0.002;
+      }
+      if (fill[k] > 0 && fill[k] < 0.9) {   // the last one or two lean over into the gap
+        // pivots on its bottom-left edge, top resting on the last upright one
+        const bw = 0.03, bh = 0.24, lean = 0.32 + rnd() * 0.2;
+        const geo = boxGeo(bw, bh, 0.19, 0.5); geo.translate(bw / 2, bh / 2, 0);
+        const b = G(g, geo, M.books[(rnd() * M.books.length) | 0], x + Math.sin(lean) * bh, y, -d / 2 + 0.13);
+        b.rotation.z = lean;
+        b.userData.noScan = true;
+      }
+    }
+    // a stack lying flat on the empty shelf
+    let y = 3 * 0.37 + 0.025;
+    for (let k = 0; k < 4; k++) {
+      const bh = 0.025 + rnd() * 0.02;
+      const b = B(g, 0.2 + rnd() * 0.06, bh, 0.15 + rnd() * 0.04, 0.12 + (rnd() - 0.5) * 0.03, y, 0, M.books[k % M.books.length]);
+      b.rotation.y = (rnd() - 0.5) * 0.25; b.userData.noScan = true;
+      y += bh;
+    }
   },
+  // A dust sheet over an armchair: seat, back and arms show through it as soft shapes.
   armchair(g, w, d, f, M) {
-    const m = f.sheet ? M.sheet : M.fabric;
-    B(g, w, 0.45, d, 0, 0, 0, m);
-    B(g, w, 0.5, 0.2, 0, 0.45, -d / 2 + 0.1, m);
-    B(g, 0.16, 0.22, d - 0.2, -w / 2 + 0.08, 0.45, 0.1, m); B(g, 0.16, 0.22, d - 0.2, w / 2 - 0.08, 0.45, 0.1, m);
+    const boxes = [
+      { x0: -w / 2, x1: w / 2, z0: -d / 2, z1: d / 2, h: 0.45 },
+      { x0: -w / 2, x1: w / 2, z0: -d / 2, z1: -d / 2 + 0.2, h: 0.95 },
+      { x0: -w / 2, x1: -w / 2 + 0.16, z0: -d / 2, z1: d / 2, h: 0.67 },
+      { x0: w / 2 - 0.16, x1: w / 2, z0: -d / 2, z1: d / 2, h: 0.67 },
+    ];
+    for (const b of boxes) hidden(g, b.x1 - b.x0, b.h, b.z1 - b.z0, (b.x0 + b.x1) / 2, 0, (b.z0 + b.z1) / 2);
+    if (f.sheet) sheetOver(g, w - 0.03, d - 0.03, boxes.map((b) => ({ ...b, h: b.h - 0.01 })), M, { hang: 0.95, hem: 0.005, seed: w * 7 + d, fold: 0.035 });
+    else for (const b of boxes) RB(g, b.x1 - b.x0, b.h, b.z1 - b.z0, 0.04, (b.x0 + b.x1) / 2, 0, (b.z0 + b.z1) / 2, M.fabric);
   },
   sofa(g, w, d, f, M) {
     legs(g, w, d, 0.15, M.wood, 0.05);
-    const m = f.sheet ? M.sheet : M.fabric;
-    B(g, w, 0.3, d, 0, 0.15, 0, m);
-    B(g, w, 0.45, 0.22, 0, 0.45, -d / 2 + 0.11, m);
-    B(g, 0.2, 0.22, d - 0.22, -w / 2 + 0.1, 0.45, 0.11, m); B(g, 0.2, 0.22, d - 0.22, w / 2 - 0.1, 0.45, 0.11, m);
-    // the sheet's hem, hanging just clear of a robot
-    B(g, w + 0.03, 0.08, 0.012, 0, 0.17, d / 2 + 0.01, m); B(g, 0.012, 0.08, d, -w / 2 - 0.01, 0.17, 0, m); B(g, 0.012, 0.08, d, w / 2 + 0.01, 0.17, 0, m);
+    // the frame and seat under the sheet: its underside is what a robot hiding here looks up at
+    B(g, w - 0.04, 0.27, d - 0.04, 0, 0.16, 0, M.underside);   // starts above the slats' undersides
+    const boxes = [
+      { x0: -w / 2, x1: w / 2, z0: -d / 2, z1: d / 2, h: 0.45 },
+      { x0: -w / 2, x1: w / 2, z0: -d / 2, z1: -d / 2 + 0.22, h: 0.92 },
+      { x0: -w / 2, x1: -w / 2 + 0.2, z0: -d / 2, z1: d / 2, h: 0.66 },
+      { x0: w / 2 - 0.2, x1: w / 2, z0: -d / 2, z1: d / 2, h: 0.66 },
+    ];
+    for (const b of boxes.slice(1)) hidden(g, b.x1 - b.x0, b.h - 0.45, b.z1 - b.z0, (b.x0 + b.x1) / 2, 0.45, (b.z0 + b.z1) / 2);
+    // three seat cushions, the dip between them shows through the cloth
+    const cw = (w - 0.4) / 3;
+    const top = [];
+    for (let k = 0; k < 3; k++) top.push({ x0: -w / 2 + 0.2 + k * cw + 0.03, x1: -w / 2 + 0.2 + (k + 1) * cw - 0.03, z0: -d / 2 + 0.22, z1: d / 2 - 0.01, h: 0.5 });
+    if (f.sheet) sheetOver(g, w - 0.03, d - 0.03, [...boxes, ...top], M, { hang: 0.8, hem: 0.17, seed: 3, fold: 0.03 });
+    else for (const b of [...boxes, ...top]) RB(g, b.x1 - b.x0, b.h - 0.15, b.z1 - b.z0, 0.04, (b.x0 + b.x1) / 2, 0.15, (b.z0 + b.z1) / 2, M.fabric);
     // under-side slats
     for (let k = 0; k < 5; k++) B(g, w - 0.1, 0.02, 0.06, 0, 0.15, -d / 2 + 0.12 + k * (d - 0.24) / 4, M.wood);
   },
@@ -684,14 +810,24 @@ const BUILDERS = {
     g.add(m);
     return { lampShade: shade };
   },
+  // Nobody watered it after they left: long leaves gone brown and folded over the rim.
   plant(g, w, d, f, M) {
-    C(g, 0.17, 0.13, 0.32, 0, 0, 0, M.pot, 14);
-    for (let k = 0; k < 7; k++) {
-      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.55, 5), M.plantDead);
-      const a = (k / 7) * Math.PI * 2;
-      leaf.position.set(Math.cos(a) * 0.06, 0.55, Math.sin(a) * 0.06);
-      leaf.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9 - 0.2);
-      g.add(leaf);
+    G(g, lathe([[0.001, 0], [0.12, 0], [0.13, 0.02], [0.165, 0.29], [0.18, 0.3], [0.18, 0.33], [0.165, 0.33], [0.155, 0.3]], 20), M.pot);
+    G(g, new THREE.CircleGeometry(0.155, 18).rotateX(-Math.PI / 2), M.soil, 0, 0.3, 0);
+    for (let k = 0; k < 11; k++) {
+      const a = (k / 11) * Math.PI * 2 + rnd() * 0.4, up = 0.25 + rnd() * 0.45, out = 0.18 + rnd() * 0.25;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      // up out of the soil, over, and down: the snapped ones fold sharply
+      const snap = rnd() < 0.4;
+      const pts = [[0.02, 0.3], [0.04, 0.3 + up * 0.5], [out * 0.5, 0.3 + up], [out, 0.3 + up * (snap ? 0.3 : 0.75)], [out * 1.25, 0.3 + up * (snap ? -0.2 : 0.35)]]
+        .map(([r, y]) => new THREE.Vector3(ca * r, y, sa * r));
+      const m = G(g, strip(pts, 0.022, 0.006, 12), k % 3 ? M.plantDead : M.plantDry);
+      m.userData.noScan = true;
+    }
+    for (let k = 0; k < 3; k++) {   // a few curled leaves dropped on the floor
+      const a = rnd() * 6.28, r = 0.22 + rnd() * 0.15;
+      const pts = [[0, 0.006], [0.06, 0.012], [0.1, 0.02]].map(([u, y]) => new THREE.Vector3(Math.cos(a) * (r + u), y, Math.sin(a) * (r + u)));
+      G(g, strip(pts, 0.015, 0.004, 4), M.plantDry).userData.noScan = true;
     }
   },
   boxes(g, w, d, f, M, tx) {
@@ -707,15 +843,73 @@ const BUILDERS = {
       y += h;
     }
   },
+  // f.sink / f.stove: x of a sink or a cooker along the run. f.uppers: [[x0, x1]] spans of wall cupboards.
   counter(g, w, d, f, M) {
     B(g, w, 0.1, d - 0.1, 0, 0, -0.05, M.black);
     B(g, w, 0.78, d - 0.04, 0, 0.1, -0.02, M.cabinet);
-    B(g, w, 0.04, d, 0, 0.88, 0, M.stone);
     const n = Math.max(1, Math.round(w / 0.6));
     for (let k = 0; k < n; k++) {
       const x = -w / 2 + (k + 0.5) * (w / n);
+      if (f.stove != null && Math.abs(x - f.stove) < 0.35) continue;
       B(g, 0.008, 0.7, 0.004, x + w / n / 2 - 0.004, 0.14, d / 2 - 0.02, M.black);
       B(g, 0.1, 0.015, 0.02, x, 0.78, d / 2 - 0.01, M.metal);
+      B(g, w / n - 0.06, 0.012, 0.004, x, 0.71, d / 2 - 0.019, M.black);   // drawer line
+    }
+    const top = (x0, x1) => B(g, x1 - x0, 0.04, d, (x0 + x1) / 2, 0.88, 0, M.stone);
+    if (f.sink != null) {
+      // worktop with a hole, a steel basin sunk into it, and a swan-neck tap
+      const sx = f.sink, bw = 0.62, bd = 0.42, bz = 0.02;
+
+      B(g, bw, 0.04, (d - bd) / 2 + bz, sx, 0.88, -d / 2 + ((d - bd) / 2 + bz) / 2, M.stone);
+      B(g, bw, 0.04, (d - bd) / 2 - bz, sx, 0.88, d / 2 - ((d - bd) / 2 - bz) / 2, M.stone);
+      const rim = stadium(bw - 0.02, bd - 0.02, 0.05);
+      rim.holes.push(stadium(bw - 0.06, bd - 0.06, 0.035, new THREE.Path()));
+      const ring = extrudeUp(rim, 0.012, 0.004);
+      G(g, ring, M.steel, sx, 0.915, bz);
+      const bowl = new THREE.Mesh(extrudeUp(stadium(bw - 0.07, bd - 0.07, 0.04), 0.2, 0.02), M.steelIn);
+      bowl.position.set(sx, 0.72, bz);
+      g.add(bowl);
+      G(g, new THREE.CircleGeometry(0.025, 12).rotateX(-Math.PI / 2), M.black, sx, 0.725, bz);
+      const tap = [[0, 0.92, -0.2], [0, 1.12, -0.2], [0, 1.2, -0.13], [0, 1.14, -0.06], [0, 1.08, -0.05]].map(([x, y, z]) => new THREE.Vector3(sx + x, y, z));
+      G(g, pipe(tap, 0.012, 20, 8), M.steel);
+      for (const s of [-1, 1]) C(g, 0.018, 0.02, 0.05, sx + s * 0.11, 0.92, -0.2, M.steel, 10);
+    }
+    // the worktop runs between the sink and the cooker, not over them
+    const gaps = [];
+    if (f.sink != null) gaps.push([f.sink - 0.31, f.sink + 0.31]);
+    if (f.stove != null) gaps.push([f.stove - 0.3, f.stove + 0.3]);
+    gaps.sort((a, b) => a[0] - b[0]);
+    let from = -w / 2;
+    for (const [a, b] of gaps) { if (a > from + 1e-3) top(from, a); from = b; }
+    if (from < w / 2 - 1e-3) top(from, w / 2);
+    if (f.stove != null) {
+      // a freestanding cooker set into the run: oven door, window, knobs, four rings
+      const x = f.stove, ow = 0.6;
+      B(g, ow, 0.86, d - 0.02, x, 0.02, 0, M.white);
+      B(g, ow - 0.06, 0.52, 0.015, x, 0.12, d / 2 - 0.002, M.white);
+      B(g, ow - 0.16, 0.26, 0.004, x, 0.26, d / 2 + 0.006, M.ovenGlass);
+      B(g, ow - 0.12, 0.018, 0.03, x, 0.68, d / 2 + 0.02, M.steel);
+      for (let k = 0; k < 4; k++) C(g, 0.016, 0.018, 0.02, x - 0.2 + k * 0.133, 0.78, d / 2 + 0.008, M.black, 10).rotation.x = Math.PI / 2;
+      B(g, ow, 0.035, d - 0.02, x, 0.88, 0, M.hob);   // flush with the worktop
+      for (const [ox, oz, r] of [[-0.14, -0.12, 0.07], [0.14, -0.12, 0.055], [-0.14, 0.13, 0.055], [0.14, 0.13, 0.07]]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.006, 6, 24), M.black);
+        ring.rotation.x = Math.PI / 2; ring.position.set(x + ox, 0.918, oz);
+        g.add(ring);
+      }
+    }
+    for (const [x0, x1] of f.uppers || []) {
+      // wall cupboards, doors a hand's width apart, handles at the bottom corners
+      const uw = x1 - x0, ud = 0.34, cx = (x0 + x1) / 2, z = -d / 2 + ud / 2;
+      B(g, uw, 0.72, ud, cx, 1.48, z, M.cabinet);
+      B(g, uw + 0.02, 0.025, ud + 0.02, cx, 2.2, z + 0.01, M.cabinet);
+      const nd = Math.max(1, Math.round(uw / 0.45));
+      for (let k = 0; k < nd; k++) {
+        const dx = x0 + (k + 0.5) * (uw / nd);
+        B(g, uw / nd - 0.012, 0.69, 0.012, dx, 1.495, z + ud / 2 + 0.004, M.cabinet);
+        B(g, 0.012, 0.08, 0.02, dx + (k % 2 ? -1 : 1) * (uw / nd / 2 - 0.04), 1.52, z + ud / 2 + 0.018, M.metal);
+      }
+      const shelf = B(g, uw, 0.01, 0.01, cx, 1.47, z + ud / 2 + 0.004, M.black);
+      shelf.userData.noScan = true;
     }
   },
   fridge(g, w, d, f, M, tx, house) {
@@ -725,7 +919,7 @@ const BUILDERS = {
     const door = B(pivot, w, 1.83, 0.06, w / 2, 0.01, 0.03, M.white);
     B(pivot, 0.03, 0.4, 0.03, w - 0.07, 0.9, 0.075, M.metal);
     const inner = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.08, 1.7), new THREE.MeshBasicMaterial({ color: 0x0a0b0c }));
-    inner.position.set(0, 0.95, d / 2 - 0.0605);
+    inner.position.set(0, 0.95, d / 2 - 0.056);   // a few mm proud of the cabinet front, under the closed door
     g.add(pivot, inner);
     return { fridgeDoor: pivot, fridgeInner: inner.material };
   },
@@ -769,11 +963,25 @@ const BUILDERS = {
   coatRack(g, w, d, f, M) {
     C(g, 0.16, 0.17, 0.03, 0, 0, 0, M.wood, 14);
     C(g, 0.02, 0.02, 1.75, 0, 0.03, 0, M.wood);
-    const coat = new THREE.MeshStandardMaterial({ color: 0x1d1f24, roughness: 0.95 });
-    C(g, 0.12, 0.2, 0.95, 0.06, 0.65, 0.02, coat, 10);
-    const hood = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), coat);
-    hood.position.set(0.06, 1.65, 0.02);
-    g.add(hood);
+    for (let k = 0; k < 4; k++) {   // hooks
+      const a = (k / 4) * Math.PI * 2 + 0.4;
+      G(g, pipe([[0, 1.7, 0], [Math.cos(a) * 0.08, 1.72, Math.sin(a) * 0.08], [Math.cos(a) * 0.11, 1.78, Math.sin(a) * 0.11]].map((p) => new THREE.Vector3(...p)), 0.008, 6, 5), M.wood);
+    }
+    // a long dark coat hanging off one hook: hangs in folds, shoulders hunched on the hook, hood up
+    const coat = new THREE.MeshStandardMaterial({ color: 0x1d1f24, roughness: 0.95, side: THREE.DoubleSide });
+    const prof = [[0.0, 1.66], [0.05, 1.66], [0.13, 1.6], [0.15, 1.5], [0.14, 1.3], [0.15, 1.0], [0.18, 0.75], [0.2, 0.62]];
+    const cg = lathe(prof, 28, 1, 0.7);
+    const p = cg.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {   // folds, deeper toward the hem
+      v.fromBufferAttribute(p, i);
+      const a = Math.atan2(v.z, v.x), fold = 1 + Math.sin(a * 9 + v.y * 2) * 0.07 * (1.6 - v.y) + noise3(v.x * 6, v.y * 3, v.z * 6) * 0.04;
+      p.setXYZ(i, v.x * fold, v.y, v.z * fold);
+    }
+    cg.computeVertexNormals();
+    G(g, cg, coat, 0.06, 0, 0.02);
+    const hood = G(g, lump(0.1, 0.12, 0.09, 5, 0.18, 2), coat, 0.06, 1.62, 0.0);
+    hood.rotation.x = -0.3;
+    for (const s of [-1, 1]) G(g, pipe([[s * 0.13, 1.56, 0.02], [s * 0.15, 1.25, 0.04], [s * 0.14, 0.95, 0.07]].map((q) => new THREE.Vector3(q[0] + 0.06, q[1], q[2])), 0.045, 10, 8), coat);
     // Biscuit's leash, still clipped to the hook, the collar end empty on the floor
     const strap = new THREE.MeshStandardMaterial({ color: 0x9a1c1c, roughness: 0.7 });
     const pts = [[-0.03, 1.55, 0.03], [-0.07, 1.0, 0.07], [-0.09, 0.45, 0.1], [-0.08, 0.02, 0.16], [0.04, 0.01, 0.3], [0.2, 0.01, 0.32], [0.26, 0.01, 0.22]].map((p) => new THREE.Vector3(...p));
@@ -791,71 +999,130 @@ const BUILDERS = {
     g.add(clip);
   },
   // Clawfoot tub: the body sits on four feet, high enough for a robot to tuck underneath.
+  // Clawfoot tub: a hollow enamel shell on four brass paws, high enough for a robot to tuck underneath.
   tub(g, w, d, f, M) {
-    const H0 = 0.16, H = 0.44, r = d / 2 - 0.02, core = w - 2 * r * 0.55;
-    const body = (y, h, grow, mat) => {
-      B(g, core, h, d - 0.04 + grow, 0, y, 0, mat);
-      for (const s of [-1, 1]) {
-        const end = new THREE.Mesh(new THREE.CylinderGeometry(r + grow / 2, r + grow / 2 - 0.03, h, 20), mat);
-        end.scale.x = 0.55; end.position.set(s * core / 2, y + h / 2, 0);
-        g.add(end);
-      }
-    };
-    body(H0, H, 0, M.white);
-    body(H0 + H, 0.035, 0.04, M.white);   // rolled rim
-    const inner = B(g, core, 0.01, d - 0.16, 0, H0 + H + 0.03, 0, new THREE.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.3 }));
-    inner.userData.noScan = true;
-    const brass = new THREE.MeshStandardMaterial({ color: 0x9a7a3a, metalness: 0.85, roughness: 0.35 });
+    const H0 = 0.16, H = 0.46, R = d / 2 - 0.02;
+    const shell = stadium(w - 0.04, d - 0.04, R);
+    shell.holes.push(stadium(w - 0.14, d - 0.14, R - 0.05, new THREE.Path()));
+    G(g, extrudeUp(shell, H, 0.025), M.enamel, 0, H0, 0);
+    // the bottom of the shell (seen from underneath), and the inside floor, stained where the water stood
+    G(g, extrudeUp(stadium(w - 0.08, d - 0.08, R - 0.03), 0.04, 0.012), M.enamel, 0, H0, 0);
+    M.tubFloor.map.repeat.set(1 / (w - 0.15), 1 / (d - 0.15)); M.tubFloor.map.offset.set(0.5, 0.5);
+    const floor = G(g, new THREE.ShapeGeometry(stadium(w - 0.15, d - 0.15, R - 0.06), 12).rotateX(-Math.PI / 2), M.tubFloor, 0, H0 + 0.05, 0);
+    floor.userData.noScan = true;
+    const brass = M.brass;
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const fx = sx * (w / 2 - 0.08), fz = sz * (d / 2 - 0.08);
-      C(g, 0.035, 0.02, H0 + 0.02, fx, 0.02, fz, brass, 8);
-      const claw = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), brass);
-      claw.scale.set(1.2, 0.6, 1.2); claw.position.set(fx + sx * 0.01, 0.02, fz + sz * 0.01);
-      g.add(claw);
+      const fx = sx * (w / 2 - 0.14), fz = sz * (d / 2 - 0.14);   // matches the collision legs in level.js
+      // a turned leg flaring into a paw with three toes
+      const leg = G(g, lathe([[0.001, H0 + 0.02], [0.03, H0 + 0.02], [0.022, H0 - 0.04], [0.026, 0.06], [0.036, 0.03], [0.001, 0.03]], 10), brass, fx, 0, fz);
+      leg.rotation.y = Math.atan2(sx, sz);
+      for (let t = -1; t <= 1; t++) {
+        const a = Math.atan2(sx, sz) + t * 0.5;
+        const toe = G(g, new THREE.SphereGeometry(0.018, 8, 6), brass, fx + Math.sin(a) * 0.03, 0.016, fz + Math.cos(a) * 0.03);
+        toe.scale.set(1, 0.9, 1.4); toe.rotation.y = a;
+      }
     }
-    C(g, 0.015, 0.015, 0.22, -w / 2 + 0.12, H0 + H, 0, brass);
+    // the taps and spout at the end
+    G(g, pipe([[-w / 2 + 0.12, H0 + H + 0.02, 0], [-w / 2 + 0.12, H0 + H + 0.12, 0], [-w / 2 + 0.2, H0 + H + 0.1, 0]].map((p) => new THREE.Vector3(...p)), 0.013, 10, 8), brass);
+    for (const s of [-1, 1]) C(g, 0.016, 0.02, 0.06, -w / 2 + 0.07, H0 + H, s * 0.08, brass, 10);
   },
 
+  // Facing +z: a turned pan on a pedestal, an oval seat with the lid up, a cistern against the wall.
   toilet(g, w, d, f, M) {
-    B(g, w * 0.6, 0.38, d * 0.55, 0, 0, 0.05, M.white);
-    B(g, w * 0.85, 0.06, d * 0.7, 0, 0.38, 0.06, M.white);
-    B(g, w, 0.42, 0.18, 0, 0.38, -d / 2 + 0.09, M.white);
+    const bz = 0.07;
+    G(g, lathe([[0.001, 0], [0.11, 0], [0.1, 0.06], [0.11, 0.2], [0.16, 0.33], [0.19, 0.39], [0.18, 0.4], [0.15, 0.37], [0.09, 0.29], [0.001, 0.27]], 24, 0.85, 1.12), M.porcelain, 0, 0, bz);
+    G(g, new THREE.CircleGeometry(0.075, 16).rotateX(-Math.PI / 2), M.water, 0, 0.3, bz + 0.02).userData.noScan = true;
+    const seat = G(g, new THREE.TorusGeometry(0.15, 0.02, 8, 28), M.porcelain, 0, 0.415, bz);
+    seat.rotation.x = Math.PI / 2; seat.scale.set(0.82, 1.15, 0.6);
+    const lid = G(g, extrudeUp(stadium(0.3, 0.38, 0.14), 0.02, 0.008), M.porcelain, 0, 0.6, -d / 2 + 0.2);
+    lid.rotation.x = -1.35;
+    RB(g, w * 0.88, 0.36, 0.17, 0.025, 0, 0.36, -d / 2 + 0.095, M.porcelain);
+    RB(g, w * 0.92, 0.035, 0.2, 0.012, 0, 0.72, -d / 2 + 0.1, M.porcelain);
+    B(g, 0.05, 0.012, 0.02, -w * 0.3, 0.64, -d / 2 + 0.19, M.steel);
   },
+  // Facing +z: a vanity unit with two doors, a basin set in it, a tap, a mirror on the wall above.
   sink(g, w, d, f, M) {
-    B(g, w, 0.82, d, 0, 0, 0, M.cabinet);
-    B(g, w + 0.02, 0.05, d + 0.02, 0, 0.82, 0, M.white);
-    const mirror = new THREE.Mesh(new THREE.PlaneGeometry(d * 0.9, 0.7), new THREE.MeshStandardMaterial({ color: 0x40464c, metalness: 1, roughness: 0.08 }));
-    mirror.position.set(0, 1.45, -w / 2 + 0.005);
+    B(g, w - 0.02, 0.06, d - 0.06, 0, 0, -0.02, M.black);
+    B(g, w, 0.76, d - 0.02, 0, 0.06, -0.01, M.cabinet);
+    for (const s of [-1, 1]) {
+      B(g, w / 2 - 0.02, 0.68, 0.014, s * w / 4, 0.1, d / 2 - 0.013, M.cabinet);
+      B(g, 0.012, 0.09, 0.02, s * 0.04, 0.68, d / 2, M.steel);
+    }
+    const top = stadium(w + 0.02, d + 0.02, 0.03);
+    top.holes.push(stadium(w * 0.62, d * 0.55, 0.12, new THREE.Path()));
+    G(g, extrudeUp(top, 0.05, 0.01), M.porcelain, 0, 0.82, 0.01);
+    const bowl = G(g, extrudeUp(stadium(w * 0.62, d * 0.55, 0.12), 0.16, 0.03), M.basinIn, 0, 0.71, 0.01);
+    bowl.userData.noScan = true;
+    G(g, new THREE.CircleGeometry(0.018, 10).rotateX(-Math.PI / 2), M.black, 0, 0.716, 0.01).userData.noScan = true;
+    G(g, pipe([[0, 0.87, -d / 2 + 0.08], [0, 0.97, -d / 2 + 0.08], [0, 0.99, -d / 2 + 0.15], [0, 0.95, -d / 2 + 0.2]].map((p) => new THREE.Vector3(...p)), 0.011, 12, 8), M.steel);
+    for (const s of [-1, 1]) C(g, 0.016, 0.018, 0.04, s * 0.12, 0.87, -d / 2 + 0.08, M.steel, 10);
+    const mirror = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.9, 0.7), new THREE.MeshStandardMaterial({ color: 0x2c3034, metalness: 0.9, roughness: 0.12 }));
+    mirror.position.set(0, 1.45, -d / 2 + 0.006);
     g.add(mirror);
+    B(g, w * 0.9 + 0.05, 0.75, 0.004, 0, 1.075, -d / 2 + 0.002, M.frame).userData.noScan = true;   // between the wall and the glass
   },
   kidBed(g, w, d, f, M) {
     legs(g, w, d, 0.24, M.paint, 0.05);
     B(g, w, 0.06, d, 0, 0.24, 0, M.paint);
     for (let k = 0; k < 7; k++) B(g, w - 0.08, 0.02, 0.07, 0, 0.23, -d / 2 + 0.15 + k * (d - 0.3) / 6, M.wood);
-    B(g, w - 0.04, 0.16, d - 0.06, 0, 0.3, 0.02, M.mattress);
-    B(g, w, 0.06, d - 0.3, 0, 0.44, 0.15, M.fabricBlue);
-    B(g, w - 0.3, 0.1, 0.3, 0, 0.46, -d / 2 + 0.25, M.white);
-    B(g, w, 0.55, 0.05, 0, 0.24, -d / 2 + 0.025, M.paint);
-    // teddy bear, sitting up and facing the door
-    const fur = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 1 });
-    const bear = new THREE.Group();
-    const sp = (r, x, y, z, m = fur) => { const s = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), m); s.position.set(x, y, z); bear.add(s); return s; };
-    sp(0.09, 0, 0.09, 0); sp(0.065, 0, 0.22, 0.01); sp(0.025, -0.05, 0.28, 0); sp(0.025, 0.05, 0.28, 0);
-    sp(0.008, -0.022, 0.235, 0.065, M.black); sp(0.008, 0.022, 0.235, 0.065, M.black);
-    bear.position.set(0.15, 0.5, -d / 2 + 0.45);
+    RB(g, w - 0.07, 0.16, d - 0.08, 0.03, 0, 0.3, 0.02, M.mattress);   // inside the head and foot boards
+    // headboard and footboard with rounded posts
+    RB(g, w - 0.04, 0.5, 0.04, 0.015, 0, 0.27, -d / 2 + 0.025, M.paint);
+    RB(g, w - 0.04, 0.22, 0.04, 0.015, 0, 0.27, d / 2 - 0.025, M.paint);
+    for (const [sx, sz, h] of [[-1, -1, 0.8], [1, -1, 0.8], [-1, 1, 0.52], [1, 1, 0.52]]) {
+      C(g, 0.025, 0.025, h - 0.24, sx * (w / 2 - 0.025), 0.24, sz * (d / 2 - 0.025), M.paint, 12);
+      G(g, new THREE.SphereGeometry(0.032, 12, 8), M.paint, sx * (w / 2 - 0.025), h + 0.01, sz * (d / 2 - 0.025));
+    }
+    // the duvet, thrown back at the top, hanging over the sides
+    const bw = w - 0.04, bd = d - 0.4, bz = 0.2;
+    const duvet = G(g, drapeGeo(bw, bd, [{ x0: -bw / 2, x1: bw / 2, z0: -bd / 2, z1: bd / 2, h: 0.47 }], { ext: [0.17, 0.17, 0.0, 0.14], hem: 0.31, seed: 9, fold: 0.02, soft: 0.04 }), M.duvet, 0, 0, bz);
+    duvet.userData.noScan = true;
+    G(g, pipe([[-bw / 2 - 0.01, 0.475, bz - bd / 2 + 0.03], [bw / 2 + 0.01, 0.475, bz - bd / 2 + 0.03]].map((p) => new THREE.Vector3(...p)), 0.03, 4, 10), M.duvet).userData.noScan = true;
+    // a pillow, squashed
+    const pil = G(g, lump(0.2, 0.05, 0.13, 4, 0.12, 3), M.pillow, 0, 0.47, -d / 2 + 0.22);
+    pil.userData.noScan = true;
+    // teddy bear, sitting up against the pillow, facing the door
+    const fur = M.fur, bear = new THREE.Group();
+    const sp = (geo, x, y, z, m = fur) => { const s = new THREE.Mesh(geo, m); s.position.set(x, y, z); bear.add(s); return s; };
+    sp(lump(0.075, 0.09, 0.065, 2, 0.06, 2), 0, 0.085, 0);                       // body
+    sp(lump(0.062, 0.058, 0.058, 3, 0.05, 2), 0, 0.215, 0.005);                  // head
+    sp(lump(0.03, 0.022, 0.028, 4, 0.05, 1), 0, 0.2, 0.055, M.furLight);         // muzzle
+    sp(new THREE.SphereGeometry(0.009, 8, 6), 0, 0.212, 0.082, M.black);         // nose
+    for (const s of [-1, 1]) {
+      sp(new THREE.SphereGeometry(0.024, 10, 8), s * 0.045, 0.265, -0.005).scale.set(1, 1, 0.55);   // ears
+      sp(new THREE.SphereGeometry(0.0065, 6, 5), s * 0.022, 0.232, 0.052, M.black);                 // button eyes
+      const arm = sp(lump(0.026, 0.055, 0.026, 6 + s, 0.05, 1), s * 0.075, 0.11, 0.015); arm.rotation.z = s * 0.5;
+      const leg = sp(lump(0.03, 0.03, 0.06, 8 + s, 0.05, 1), s * 0.045, 0.028, 0.05);   // legs out in front
+      leg.rotation.y = s * 0.2;
+    }
+    bear.position.set(0.15, 0.47, -d / 2 + 0.42);
     bear.rotation.y = 0.4;
+    bear.traverse((o) => { o.userData.noScan = true; });
     g.add(bear);
   },
   bed(g, w, d, f, M) {
     legs(g, w, d, 0.27, M.wood, 0.06);
     B(g, w, 0.08, d, 0, 0.27, 0, M.wood);
     for (let k = 0; k < 9; k++) B(g, w - 0.1, 0.02, 0.08, 0, 0.26, -d / 2 + 0.15 + k * (d - 0.3) / 8, M.wood);
-    B(g, w - 0.06, 0.24, d - 0.08, 0, 0.35, 0.02, M.mattress);
+    // a bare mattress, buttoned, stained
+    RB(g, w - 0.06, 0.24, d - 0.08, 0.05, 0, 0.35, 0.02, M.mattressBare, 2);
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) {
+      const b = G(g, new THREE.SphereGeometry(0.009, 6, 4), M.mattressBare, -w / 2 + 0.3 + i * (w - 0.6) / 3, 0.59, -d / 2 + 0.3 + j * (d - 0.6) / 5);
+      b.scale.y = 0.4; b.userData.noScan = true;
+    }
+    // headboard: a panel in a frame
     B(g, w, 0.9, 0.06, 0, 0.27, -d / 2 + 0.03, M.wood);
+    RB(g, w - 0.2, 0.5, 0.025, 0.01, 0, 0.55, -d / 2 + 0.07, M.wood);
+    RB(g, w + 0.06, 0.05, 0.09, 0.02, 0, 1.17, -d / 2 + 0.03, M.wood);
   },
+  // A red toy chest: lid with an overhang, a hinge strap, rope handles, and something stuffed under the lid.
   toyChest(g, w, d, f, M) {
-    B(g, w, 0.45, d, 0, 0, 0, M.red);
-    B(g, w + 0.02, 0.05, d + 0.02, 0, 0.45, 0, M.red);
+    RB(g, w, 0.42, d, 0.02, 0, 0, 0, M.red);
+    const lid = RB(g, w + 0.03, 0.05, d + 0.03, 0.02, 0, 0.43, -0.005, M.red);
+    lid.rotation.x = -0.06;
+    B(g, w - 0.1, 0.02, 0.005, 0, 0.34, d / 2 + 0.002, M.redDark);
+    for (const s of [-1, 1]) G(g, new THREE.TorusGeometry(0.04, 0.008, 6, 14, Math.PI), M.rope, s * (w / 2 + 0.005), 0.3, 0).rotation.set(0, Math.PI / 2, Math.PI);
+    G(g, pipe([[-0.15, 0.43, d / 2 - 0.02], [-0.12, 0.44, d / 2 + 0.03], [-0.05, 0.43, d / 2 + 0.05], [0.02, 0.42, d / 2 + 0.02]].map((p) => new THREE.Vector3(...p)), 0.02, 8, 8), M.fabricBlue).userData.noScan = true;
   },
   desk(g, w, d, f, M) {
     legs(g, w, d, 0.68, M.paint, 0.04, 0.02);
@@ -872,14 +1139,22 @@ const BUILDERS = {
     for (const s of [-1, 1]) B(g, 0.02, 0.18, 0.03, s * 0.06, 1.0, d / 2 + 0.01, M.metal);
   },
   dresser(g, w, d, f, M) {
-    B(g, w, 0.85, d, 0, 0, 0, f.sheet ? M.sheet : M.wood);
-    if (f.sheet) B(g, w + 0.03, 0.75, 0.012, 0, 0.06, d / 2 + 0.01, M.sheet);
+    if (f.sheet) {
+      hidden(g, w, 0.85, d, 0, 0, 0);
+      // something tall stood on it under the sheet (a mirror, a lamp): the cloth tents over it
+      sheetOver(g, w - 0.02, d - 0.02, [{ x0: -w / 2, x1: w / 2, z0: -d / 2, z1: d / 2, h: 0.85 }, { x0: w / 2 - 0.4, x1: w / 2 - 0.25, z0: -0.06, z1: 0.06, h: 1.15 }], M, { hang: 0.9, hem: 0.004, seed: 6, fold: 0.03 });
+    } else B(g, w, 0.85, d, 0, 0, 0, M.wood);
   },
+  // Front loader: porthole door with a chrome ring, a control strip, a soap drawer.
   washer(g, w, d, f, M) {
-    B(g, w, 0.85, d, 0, 0, 0, M.white);
-    const door = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), M.black);
-    door.position.set(0, 0.45, d / 2 + 0.002);
-    g.add(door);
+    RB(g, w, 0.85, d, 0.015, 0, 0, 0, M.white);
+    B(g, w - 0.04, 0.12, 0.01, 0, 0.7, d / 2, M.panel);
+    B(g, 0.18, 0.06, 0.012, -w / 2 + 0.13, 0.73, d / 2 + 0.004, M.white);
+    C(g, 0.028, 0.03, 0.025, w / 2 - 0.1, 0.735, d / 2 + 0.008, M.steel, 14).rotation.x = Math.PI / 2;
+    const ring = G(g, new THREE.TorusGeometry(0.19, 0.03, 10, 32), M.steel, 0, 0.4, d / 2 + 0.012);
+    const glass = G(g, new THREE.CircleGeometry(0.17, 28), M.porthole, 0, 0.4, d / 2 + 0.006);
+    glass.userData.noScan = ring.userData.noScan = true;
+    B(g, 0.03, 0.08, 0.02, 0.2, 0.36, d / 2 + 0.01, M.steel);
   },
   dogBed(g, w, d, f, M) {
     const fab = new THREE.MeshStandardMaterial({ color: 0x6a4a3a, roughness: 1 });
@@ -908,18 +1183,39 @@ const BUILDERS = {
       g.add(k1);
     }
   },
+  // A nest of torn clothes and bedding, pressed flat in the middle where something lies curled up.
   clothes(g, w, d, f, M) {
-    const cols = [0x2a2e3a, 0x4a3030, 0x3a4a3a, 0x8a8070, 0x1e1e22, 0x5a5a7a];
-    for (let k = 0; k < 16; k++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.18 + Math.random() * 0.12, 8, 6), new THREE.MeshStandardMaterial({ color: cols[k % cols.length], roughness: 1 }));
-      const a = Math.random() * Math.PI * 2, rr = Math.random() * 0.4;
-      m.position.set(Math.cos(a) * rr * (w / 1.2), 0.1 + Math.random() * 0.2, Math.sin(a) * rr * (d / 1.2));
-      m.scale.set(1.3, 0.45, 1);
-      m.rotation.y = Math.random() * 3;
-      g.add(m);
+    for (let k = 0; k < 13; k++) {
+      const a = (k / 13) * Math.PI * 2 + rnd() * 0.5, rr = 0.3 + rnd() * 0.22;
+      const m = G(g, lump(0.2 + rnd() * 0.12, 0.08 + rnd() * 0.09, 0.15 + rnd() * 0.1, k + 1, 0.32, 2), M.rags[k % M.rags.length],
+        Math.cos(a) * rr * (w / 1.1), 0.02, Math.sin(a) * rr * (d / 1.1));
+      m.rotation.y = a + rnd();
+    }
+    G(g, lump(0.3, 0.04, 0.26, 21, 0.2, 3), M.rags[1], 0, 0.0, 0);   // the hollow
+    for (let k = 0; k < 4; k++) {   // sleeves and a sheet trailing out of it
+      const a = rnd() * 6.28, L = 0.35 + rnd() * 0.3;
+      const pts = [0, 0.33, 0.66, 1].map((t) => new THREE.Vector3(Math.cos(a) * (0.35 + t * L), 0.05 + (1 - t) * 0.08 + Math.sin(t * 9 + k) * 0.01, Math.sin(a) * (0.35 + t * L) + Math.sin(t * 5) * 0.05));
+      G(g, pipe(pts, 0.035 - k * 0.004, 10, 7), M.rags[(k + 2) % M.rags.length]).scale.y = 0.6;
     }
   },
   rug(g, w, d, f, M, tx) {
+    if (f.runner) {   // a long hall runner: its pattern repeats along it, with a fringe at each end
+      const t = tx.runner(f.color);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: t, roughness: 1 }));
+      const uv = m.geometry.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (w / (d * 2)));
+      m.rotation.x = -Math.PI / 2;
+      m.position.y = 0.004;
+      m.userData.noShadow = true;
+      g.add(m);
+      for (const s of [-1, 1]) {
+        const fr = new THREE.Mesh(new THREE.PlaneGeometry(0.06, d - 0.04), M.fringe);
+        fr.rotation.x = -Math.PI / 2; fr.position.set(s * (w / 2 + 0.03), 0.0045, 0);
+        fr.userData.noShadow = true;
+        g.add(fr);
+      }
+      return;
+    }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: tx.rug(f.color, !!f.round), roughness: 1, transparent: !!f.round, alphaTest: f.round ? 0.5 : 0 }));
     m.rotation.x = -Math.PI / 2;
     m.position.y = 0.004;

@@ -186,7 +186,7 @@ export class World {
       if (info.los) this.losBlocks.push(r);
       if (info.solid) this.solids.push(r);
       if (info.legs) {
-        const s = 0.05, i = 0.03;
+        const [s, i] = info.leg || [0.05, 0.03];
         for (const [lx, lz] of [[r.x0 + i, r.z0 + i], [r.x1 - i - s, r.z0 + i], [r.x0 + i, r.z1 - i - s], [r.x1 - i - s, r.z1 - i - s]])
           this.solids.push({ x0: lx, z0: lz, x1: lx + s, z1: lz + s, leg: true });
         if (info.clear < T.bodyHeight) this.solids.push(r);
@@ -219,6 +219,20 @@ export class World {
     return -1;
   }
   roomIndex(id) { return ROOMS.findIndex((r) => r.id === id); }
+
+  // How deep a ball of radius r at (x, y, z) sits inside a wall or a door (0 when clear).
+  wallPen(x, y, z, r) {
+    let worst = 0;
+    const test = (b, y0, y1) => {
+      if (y < y0 - r || y > y1 + r) return;
+      const dx = Math.max(b.x0 - x, 0, x - b.x1), dz = Math.max(b.z0 - z, 0, z - b.z1);
+      if (dx > 0 || dz > 0) { const d = Math.hypot(dx, dz); if (d < r) worst = Math.max(worst, r - d); return; }
+      worst = Math.max(worst, r + Math.min(x - b.x0, b.x1 - x, z - b.z0, b.z1 - z));
+    };
+    for (const p of this.pieces) test(p, p.y0, p.y1);
+    for (const d of this.doorBlocks || []) test(d, 0, HOUSE.doorTop);
+    return worst;
+  }
 
   // Push a circle out of everything solid. Returns the corrected spot and the push direction.
   collide(x, z, r) {
