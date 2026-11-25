@@ -87,6 +87,11 @@ function boot() {
     document.body.classList.add('debug');
     game.drive = (throttle, steer, secs) => { game.input.override = { throttle, steer, secs, until: performance.now() + secs * 1000 }; };
     game.place = (x, z, yawDeg = 0) => { Object.assign(game.roomba, { x, z, yaw: (yawDeg * Math.PI) / 180, v: 0 }); };
+    // Save what is on screen now to shots/<name>.png (needs tools/serve.py).
+    game.shot = (name) => new Promise((done) => {
+      game.post.render(game.scene, game.camera, game.time);
+      game.renderer.domElement.toBlob((b) => fetch(`/shot/${name}.png`, { method: 'POST', body: b }).then((r) => done(r.status), () => done(0)), 'image/png');
+    });
     // Art checks: freeze the game and look from a free camera, optionally floodlit and without fog.
     game.look = (x, y, z, tx, ty, tz, flood = true) => {
       const g = game;

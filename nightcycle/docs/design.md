@@ -68,6 +68,12 @@ What the robot's camera and the house do as it gets close (`src/tension.js`, `sr
   someone standing in a doorway in red, and the scan after shows nobody.
 All of it respects the "flashing effects" setting (gentler, no strobing or dropouts).
 
+The robot at work (`src/fx.js`): the intake is under the robot, behind the lens, so suction shows as the pull in
+front of the bumper: grit, fluff and the odd fibre skittering across the floor into it, more the dirtier the floor,
+and bits flicked in by the side brush. Dog food kicks up chunks. A picked-up object hops, spins and is whisked in
+under the bumper with a puff of the dust it lay in; metal glints; anything that goes into the archive also gets
+the robot's recognition scan, cyan rings on the floor and motes spiralling up.
+
 ## Core loop (built)
 
 - **Tasks**: clean a room to a dirt-removed target (65%; hallway 60%), spot-clean footprints, return to base.

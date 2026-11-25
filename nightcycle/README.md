@@ -101,7 +101,8 @@ Open `http://localhost:8083/?debug`. Keys: `1`-`7` jump to a task, `C` clean the
 `?debug&auto` skips the title. In the console, `NC` is the game; `NC.advance(seconds)` runs the simulation
 forward without waiting for frames, `NC.drive(throttle, steer, seconds)` drives, `NC.place(x, z, yawDegrees)`
 teleports, `NC.look(x, y, z, tx, ty, tz, flood)` freezes the game and looks from a free camera (floodlit by default),
-for checking art.
+for checking art, and `NC.shot(name)` saves the frame to `shots/<name>.png` (only through `tools/serve.py`; `shots/` is not
+part of the game and stays out of published copies).
 
 ## Notes
 

@@ -48,6 +48,7 @@ export class Kibble {
       }
       if (got) {
         r.bin = Math.min(100, r.bin + got * 0.25);
+        g.fx?.crunchBits(r, got);
         if (this.sound <= 0) {
           this.sound = 0.25;
           g.audio.crunch(Math.min(1, 0.5 + got * 0.25));

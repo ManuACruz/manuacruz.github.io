@@ -50,10 +50,16 @@ export class Items {
     const canSuck = r.suction && !r.dead && r.bin < 100;
     for (const it of this.list) {
       if (it.taken) {
-        if (it.anim > 0) {  // whisked under the robot
-          it.anim = Math.max(0, it.anim - dt * 4);
-          it.obj.scale.setScalar(it.anim);
-          it.obj.position.lerp(new THREE.Vector3(r.x, 0.01, r.z), 0.3);
+        if (it.anim > 0) {  // it hops, spins and is whisked in under the bumper
+          it.anim = Math.max(0, it.anim - dt * 3.2);
+          const k = 1 - it.anim;
+          it.obj.scale.setScalar(Math.min(1, it.anim * 1.6));
+          const mx = r.x + r.fx * 0.12, mz = r.z + r.fz * 0.12;
+          it.obj.position.x += (mx - it.obj.position.x) * Math.min(1, dt * (6 + k * 14));
+          it.obj.position.z += (mz - it.obj.position.z) * Math.min(1, dt * (6 + k * 14));
+          it.obj.position.y = 0.008 + Math.sin(Math.min(1, k * 1.4) * Math.PI) * 0.05;
+          it.obj.rotation.y += dt * 18;
+          it.obj.rotation.x = Math.sin(k * 9) * 0.6;
           if (it.anim === 0) it.obj.visible = false;
         }
         continue;
@@ -71,6 +77,7 @@ export class Items {
     it.tag.gone = true;
     g.roomba.bin = Math.min(100, g.roomba.bin + T.binPerItem);
     g.audio.pickup(it.def.story ? 1 : 0.7);
+    g.fx?.pickup(it.obj.position.x, it.obj.position.z, !!it.def.story, ['coin', 'ring', 'tag', 'key', 'paperclip'].includes(it.def.kind));
     this.found.push(it.def.id);
     if (it.def.text) g.hud.itemCard(it.def);
     else g.hud.log(`Picked up: ${LABEL[it.def.kind]}`);
@@ -88,6 +95,7 @@ export class Items {
       it.obj.visible = !taken;
       it.obj.scale.setScalar(1);
       it.obj.position.set(it.def.x, 0.008, it.def.z);
+      it.obj.rotation.x = 0;
       if (taken) this.found.push(it.def.id);
     });
   }
