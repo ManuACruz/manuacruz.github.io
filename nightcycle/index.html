@@ -30,6 +30,7 @@
         <span id="k-scan"><kbd>SPACE</kbd><b>SCAN</b></span>
       </div>
       <div id="status-line">CLEANING</div>
+      <div id="sensor-line"></div>
       <div id="hidden-tag">UNDER COVER</div>
     </div>
 
@@ -68,6 +69,8 @@
     <div class="panel title-panel">
       <h1 class="logo" data-text="NIGHT CYCLE">NIGHT CYCLE</h1>
       <p class="tag">You are a robot vacuum. The house is empty.<br>Mostly.</p>
+      <div id="title-diff" class="diff"></div>
+      <p id="title-diff-desc" class="muted small diff-desc"></p>
       <button id="btn-start" class="big">Start cleaning cycle</button>
       <button id="btn-settings-title" class="ghost">Settings</button>
       <div class="controls keys-only">
@@ -78,6 +81,7 @@
         <div><kbd>Space</kbd> LIDAR scan</div>
         <div><kbd>Esc</kbd> pause</div>
       </div>
+      <p class="muted small keys-only">Gamepad: left stick drive · right stick look · <kbd>X</kbd> suction · <kbd>Y</kbd> lamp · <kbd>A</kbd> scan</p>
       <div class="controls touch-only">
         <div>Left thumb: drive</div>
         <div>Right thumb: look</div>
@@ -113,6 +117,8 @@
     <div class="panel death-panel">
       <h2 id="death-title" class="glitch">SIGNAL LOST</h2>
       <p id="death-reason"></p>
+      <div id="death-log"></div>
+      <p id="death-tip"></p>
       <button id="btn-retry" class="big">Reboot from last task</button>
       <button id="btn-restart-dead" class="ghost">Restart night</button>
     </div>

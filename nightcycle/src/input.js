@@ -15,6 +15,7 @@ export class Input {
     addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.keys.add(e.code);
+      this.pad = false;   // prompts follow the device in use
       const map = { KeyE: 'suction', KeyQ: 'suction', KeyF: 'light', Space: 'scan', Escape: 'pause', KeyP: 'pause', Tab: 'map' };
       if (map[e.code]) { this.pressed.add(map[e.code]); e.preventDefault(); }
       if (e.code.startsWith('Arrow')) e.preventDefault();
@@ -106,6 +107,7 @@ export class Input {
     for (const p of pads) {
       if (!p) continue;
       const dz = (v) => (Math.abs(v) < 0.15 ? 0 : v);
+      if (p.axes.some((a) => Math.abs(a) > 0.4) || p.buttons.some((b) => b.pressed)) this.pad = true;
       th -= dz(p.axes[1] || 0); st -= dz(p.axes[0] || 0);
       if (p.buttons[7]?.value > 0.1) th += p.buttons[7].value;
       if (p.buttons[6]?.value > 0.1) th -= p.buttons[6].value;

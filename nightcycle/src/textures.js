@@ -12,17 +12,24 @@ function rng(seed) {
   };
 }
 
-function canvas(w, h) {
+// Textures are drawn in logical pixels and rasterised at SCALE x (2 on desktop for the HD camera).
+let SCALE = 1, ANISO = 4;
+export function setTextureQuality(scale, aniso) { SCALE = scale; ANISO = aniso; }
+
+function canvas(w, h, scaled = true) {
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  return [c, c.getContext('2d')];
+  const s = scaled ? SCALE : 1;
+  c.width = w * s; c.height = h * s;
+  const g = c.getContext('2d');
+  if (s !== 1) g.scale(s, s);
+  return [c, g];
 }
 
 function tex(c, { repeat = true, srgb = true } = {}) {
   const t = new THREE.CanvasTexture(c);
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = ANISO;
   return t;
 }
 
@@ -431,6 +438,61 @@ function crayonWall(seed) {
   return tex(c, { repeat: false });
 }
 
+// Crayon on the underside of Theo's bed slats. Only a robot parked under the bed, looking up, would see it.
+function underBed(seed) {
+  const r = rng(seed);
+  const [c, g] = canvas(512, 256);
+  g.fillStyle = '#1a1612';
+  g.textAlign = 'center';
+  const word = (t, x, y, size, rot) => {
+    g.save(); g.translate(x, y); g.rotate(rot); g.font = `bold ${size}px "Comic Sans MS", "Chalkboard SE", sans-serif`;
+    for (let p = 0; p < 2; p++) { g.globalAlpha = 0.75; g.fillText(t, (r() - 0.5) * 2, (r() - 0.5) * 2); }
+    g.restore(); g.globalAlpha = 1;
+  };
+  word('UNDER HERE', 190, 80, 54, -0.04);
+  word('HE CANT REACH', 210, 150, 54, 0.03);
+  // tally marks: nights survived
+  g.strokeStyle = '#1a1612'; g.lineWidth = 4; g.lineCap = 'round';
+  let x = 40;
+  for (let n = 0; n < 23; n++) {
+    const grp = n % 5;
+    g.beginPath();
+    if (grp === 4) { g.moveTo(x - 46, 208); g.lineTo(x - 4, 232); x += 18; }
+    else { g.moveTo(x + (r() - 0.5) * 3, 200); g.lineTo(x + (r() - 0.5) * 3, 240); x += 11; }
+    g.stroke();
+  }
+  // and a small drawing of a hand reaching, crossed out
+  g.lineWidth = 3;
+  g.beginPath(); g.moveTo(430, 60); g.lineTo(480, 120); g.moveTo(440, 60); g.lineTo(445, 30); g.moveTo(450, 62); g.lineTo(460, 28); g.moveTo(460, 66); g.lineTo(474, 34); g.stroke();
+  g.strokeStyle = '#b02020'; g.lineWidth = 5;
+  g.beginPath(); g.moveTo(410, 20); g.lineTo(500, 140); g.moveTo(500, 20); g.lineTo(410, 140); g.stroke();
+  return tex(c, { repeat: false });
+}
+
+// Grey scuffs where something tall keeps brushing the top of the door frames.
+function scuff(seed) {
+  const r = rng(seed);
+  const [c, g] = canvas(256, 64);
+  for (let k = 0; k < 26; k++) {
+    g.globalAlpha = 0.08 + r() * 0.14;
+    g.fillStyle = r() < 0.5 ? '#4a4844' : '#2a2826';
+    g.beginPath();
+    g.ellipse(40 + r() * 176, 20 + r() * 30, 12 + r() * 40, 2 + r() * 6, (r() - 0.5) * 0.4, 0, 7);
+    g.fill();
+  }
+  g.globalAlpha = 1;
+  return tex(c, { repeat: false });
+}
+
+// A soft round glow for fake lights.
+function glow() {
+  const [c, g] = canvas(64, 64, false);
+  const rad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  rad.addColorStop(0, 'rgba(255,255,255,1)'); rad.addColorStop(0.25, 'rgba(255,255,255,0.45)'); rad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rad; g.fillRect(0, 0, 64, 64);
+  return tex(c, { repeat: false });
+}
+
 function polaroid(seed) {
   const r = rng(seed);
   const [c, g] = canvas(128, 150);
@@ -465,6 +527,8 @@ export function makeTextures() {
     wall: {}, ceiling: ceiling(8), furnWood: furnWood(9), fabric: fabric(10, 15, 25, 30), fabricBlue: fabric(11, 210, 30, 35),
     sheet: sheet(12), cardboard: cardboard(13), door: doorPanel(), dust: dust(14), footprint: footprint(15),
     cookie: windowCookie(16), sky: windowSky(17), crayon: crayonWall(18), polaroid: polaroid(19), drawing: drawingPaper(20),
+    underBed: underBed(21), scuff: scuff(22), glow: glow(),
+
     rugs: {}, labels: {},
   };
   for (const k of ['sage', 'cream', 'plain', 'stripe', 'tile', 'kid', 'mauve']) T.wall[k] = wallpaper(k, k.length * 31);
@@ -475,7 +539,7 @@ export function makeTextures() {
 
 // A small canvas that shows TV snow.
 export function makeStatic() {
-  const [c, g] = canvas(64, 48);
+  const [c, g] = canvas(64, 48, false);
   const t = tex(c, { repeat: false });
   t.magFilter = THREE.NearestFilter;
   const img = g.createImageData(64, 48);

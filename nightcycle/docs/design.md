@@ -19,6 +19,30 @@ can't climb stairs. You can clean, hide under the sofa, and go back to your dock
 4. **Cheerful corporate voice over horror.** The BrightHome app sends emoji-laden notifications ("Mud detected
    in Kitchen and Hallway 🐾 Spot clean added!") while you clean up after it.
 
+## The Long Man (built)
+
+About 2.7 m unfolded, hunched so its head hangs forward at ~2.4 m on a long neck and is held level, cocked to
+one side. Emaciated: every rib, the spine and the shoulder blades show. Its forearms, hands, shins and feet are
+black and wet, as if it waded through something (the muddy footprints). Its legs bend the wrong way and it
+walks on long toes; its fingers hang past its knees. It folds itself down to pass under door frames.
+It has no face: a smooth head with one seam down the front. Two pinpoints of eye-shine, one above the other,
+glint in the seam when the headlamp catches them from a distance. Hunting, the seam cracks open and shivers;
+when it catches you the head splits open like a book, wet and red inside and ringed with needle teeth.
+Everything moves in stop-motion (12 poses a second). See `src/longman.js`.
+
+The body is one skinned mesh over 67 bones, sculpted in code: the torso, neck, limbs, fingers and toes are
+continuous, so it bends at the joints instead of showing balls and cylinders. Ribs (sweeping down to the front,
+the lowest parting at the costal arch), spine, shoulder blades, collarbones, hip bones, kneecaps, heel spurs,
+tendons and knuckles are sculpted into the surface, with lumps of noise under the skin. One material blends pale
+skin, bone showing through, wet black mud and shadow in the hollows from a per-vertex tint. The neck is skinned
+between chest, neck and head, so it stretches when the head comes for the lens. The skull is lumpy and asymmetric
+in the details (heavy brow, sunken temples, cheekbones) and still splits along its seam.
+Inside: a lining ridged like the roof of a mouth and threaded with veins, a pale lumpy gum along the seam, three
+uneven rows of hooked needle teeth (some missing, some snapped), a folded core with two lidded sockets, and strings
+of spit between the halves that stretch as it opens and snap one by one. The shoulders slope from the neck to a
+bony point with the deltoid capping the arm and folds into the armpit; the knees have a flat kneecap, knobs either
+side, the tendon and the hollow behind, and the joint weights differ front and back so a bent knee keeps its shape.
+
 ## Core loop (built)
 
 - **Tasks**: clean a room to a dirt-removed target (65%; hallway 60%), spot-clean footprints, return to base.
@@ -26,23 +50,39 @@ can't climb stairs. You can clean, hide under the sofa, and go back to your dock
   the robot can actually reach count (see `World.buildDirt`). The map shows swept vs. dirty.
 - **Resources**: battery (drains with movement, suction, lamp, scans) and bin (fills with dirt). The dock
   charges and empties both. Battery death is a loss: in the dark, something walks up behind you.
-- **Stealth**: noise radius by action (drive 2.2 m, suction 6.5 m, bump up to 5.5 m; walls make sound count
-  1.7 times as far). Sight 9 m with the lamp on, 2.3 m with it off, in a 130 degree cone; lamp in its face for 1.2 s
-  and it notices anyway. Suspicion builds before a chase, faster up close. Cover (sofa, coffee table, kitchen
-  table, beds) hides you completely; it walks to the edge, waits, and leaves.
-- **Checkpoints**: each task start. A retry restores dirt, items, doors, story flags, and puts it back in the
-  laundry with a short grace period.
+- **Stealth**: noise radius by action (drive 2.2 m, suction 6.5 m, bump up to 5.5 m, scan 6 m, voice prompt
+  5 m, crunching kibble 3.5 m; walls make sound count 1.7 times as far). Driving and bumping are louder on tile
+  and bare boards and quieter on rugs (the hall runner is the quiet lane). Sight 9 m with the lamp on, 2.3 m with
+  it off, in a 130 degree cone; lamp in its face for 1.2 s and it notices anyway. Short furniture hides a robot
+  tucked behind it from across the room (sight line from 2.35 m down to 6 cm), never within 1 m.
+- **Its attention, readable**: noticing you snaps its head round with a neck crack; the recognition box counts
+  up while it can see you; a chase starts no sooner than 0.45 s after it noticed (unless you are within 1 m).
+  A noise sends it into a 0.6 s freeze, head turned toward the sound, then a faster walk. Losing you is a long
+  breath out. The motion sensor registers it only while it moves: side and trend, never distance.
+- **Hiding is earned**: cover (sofa, coffee table, kitchen table, beds, clawfoot tub, hall bench) and marked nooks
+  (under Theo's desk, the pet flap) keep its body away. It searches 6 to 14 s, sometimes pretends to leave and
+  comes straight back. Noise under cover within 2.2 m makes it reach under: two sweeps of its arm along the
+  floor, 1.3 m from where it stands; the far edge is safe. Covers you hide under three times get checked.
+- **Director**: a menace value climbs while it is near you and with every chase or reach. Low, it patrols the
+  rooms next to yours; high, it goes back to the laundry, shuts the door and stays 20 to 30 s (and knocks back
+  at your noise). During the hallway task it walks the length of the hall at least three times.
+- **Checkpoints**: each task start, and on Easy and Normal every time you dock. A retry keeps the floor you
+  cleaned, the prints you mopped and what you picked up; the rest of the house goes back to the checkpoint
+  and it comes back far away. Scenes that already played (`once`) don't replay from a dock save.
+- **Death screen**: the last three things that gave you away, with the time, and one tip matched to what
+  started it.
 
 ## Night 1 beats (built)
 
 | Task | Beat |
 | --- | --- |
-| Living room | Tutorial hints. At 42% the floor lamp flickers and dies; the TV turns on to static and switches off when you approach. |
-| Kitchen | Microwave timer goes off by itself. The fridge door swings open. On completion: the back-door handle rattles, the door opens and slams, then invisible footsteps cross the house and muddy bare footprints appear one by one, ending at Theo's closed door. |
+| Living room | Tutorial hints (the dock is behind you). At 20% a knock from the laundry; from then on, until it is out, the laundry knocks back when you make noise near it, and the app suggests Quiet Mode. At 42% the floor lamp flickers and dies; the TV turns on to static and switches off when you approach. |
+| Kitchen | Microwave timer goes off by itself. The fridge door swings open. The kitchen shares a wall with the laundry. On completion: the back-door handle rattles, the door opens and slams, then invisible footsteps cross the house and muddy bare footprints appear one by one, ending at Theo's closed door. |
 | Footprints | Cleaning the last print makes Theo's door creak open by itself. |
-| Theo's room | A music box starts in the toy chest. A crayon drawing on the wall at robot height shows a house, a family and the "LONG MAN". Halfway through, the music box winds down, the hall clock stops, the laundry door opens and it walks the length of the hallway past the doorway for the first time. |
-| Hallway | It is loose. Clean the narrowest, most exposed room in the house. |
-| Return | Dock. The report says "1 person was detected at home tonight. Was this you?" The map reveals an unexplored area behind the laundry. The camera pulls out of the robot: it is standing right behind you, leaning down. |
+| Theo's room | A music box starts in the toy chest, by the door, so you face the doorway. A crayon drawing on the wall at robot height shows the "LONG MAN". Halfway through, the music box winds down, the hall clock stops, the laundry door opens (the bottom deadbolt torn out, dog food spilling into the hall) and it walks down the hall. The bedroom door swings open as it passes. It waits short of Theo's door until you are looking at the doorway (12 s at most), stops in it, folded under the frame, and looks at you; the house goes silent. Then it walks on and a nightlight dies as it passes. |
+| Hallway | It is loose, and its feet leave mud on the floor you swept, a few seconds behind it. At 30% the app takes the wheel for a "map refresh": lamp and suction on, three scans you can't cancel, and it comes. |
+| Spill | Spot-clean the dog food outside the laundry door, next to where it lives. It crunches. |
+| Return | Dock. The report says "1 person was detected at home tonight. Was this you?" The map reveals an unexplored area behind the laundry. The lamp goes off for a final map scan: the room comes back cyan, except two long legs in red right in front of you. Then the camera pulls out of the robot: it is standing over you, leaning down. |
 
 ## Story (the archive)
 
@@ -66,10 +106,23 @@ Nothing is explained outright. The dog bowl in the kitchen is freshly filled.
 - **Other robots**: a pool robot, a lawn mower in the garden, a smart speaker that talks to it.
 - **Endings**: leave through the dog door; stay and keep it clean forever; or do what the key says.
 
+## Environmental storytelling (built)
+
+Four deadbolts on the hall side of the laundry door, the lowest at robot height, and the dog flap screwed shut
+with plywood, light bleeding round it (after it gets out, the bottom bolt hangs torn out and its screws lie on
+the floor). A chain on the outside of Theo's door, ripped from the jamb. On the wall under Theo's bed, at robot
+height: "UNDER HERE HE CANT REACH" and the nights, counted. A kibble trail from the bowl to the laundry door.
+Grey scuffs on the tops of the door frames. The hall smoke alarm dangling on its wires, still blinking. Biscuit's
+leash clipped to the coat rack, the collar end empty. Claw gouges low on the back door.
+
 ## Known limits of this slice
 
 - Mobile works in principle (touch stick and buttons, low-res rendering) but was only checked at desktop size.
-- About 900 draw calls; merging static geometry per material would cut that a lot if phones struggle.
+- Static geometry is merged per material (~170 draw calls for the house); the Long Man is one skinned mesh
+  (~29k vertices) plus a dozen head parts; the door props and mud prints add a few dozen more.
+
+  HD is fill-rate bound (every light costs every pixel), so lights that are off are removed and HD scales its
+  internal resolution down automatically when frames run long.
 - The robot voice is the browser's speech synthesis and varies by system (can be turned off).
 - No save between sessions: closing the tab restarts the night.
 - Balance numbers (battery, bin, noise, sight) were tuned by reasoning and simulation, not by hours of play.

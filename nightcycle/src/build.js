@@ -1,7 +1,7 @@
-﻿// Turns the level data into a three.js scene: floors, walls, windows, doors, furniture and lights.
+// Turns the level data into a three.js scene: floors, walls, windows, doors, furniture and lights.
 
 import * as THREE from 'three';
-import { HOUSE, ROOMS, FURNITURE, LIGHTS } from './level.js';
+import { HOUSE, ROOMS, FURNITURE, LIGHTS, NIGHTLIGHTS } from './level.js';
 import { makeTextures, makeStatic } from './textures.js';
 
 const TILE = { wood: 1.6, woodDark: 1.6, checker: 1.2, smallTile: 0.8, carpet: 0.5, carpetBlue: 0.5, concrete: 1 };
@@ -52,7 +52,8 @@ export function buildHouse(scene, world) {
     const g = new THREE.PlaneGeometry(w, d);
     const uv = g.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * w + r.x0) / s, (uv.getY(i) * d - r.z1) / s);
-    const mesh = new THREE.Mesh(g, std({ map: tx.floor[r.floor], roughness: r.floor.includes('arpet') ? 1 : 0.55 }));
+    const carpet = r.floor.includes('arpet');
+    const mesh = new THREE.Mesh(g, std({ map: tx.floor[r.floor], bumpMap: tx.floor[r.floor], bumpScale: carpet ? 3 : 1.6, roughness: carpet ? 1 : 0.5 }));
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.set(r.x0 + w / 2, 0, r.z0 + d / 2);
     mesh.receiveShadow = true;
@@ -70,7 +71,7 @@ export function buildHouse(scene, world) {
 
   // ---------- walls ----------
   const wallMat = {};
-  ROOMS.forEach((r, i) => { wallMat[i] = std({ map: tx.wall[r.wall], roughness: 0.9 }); });
+  ROOMS.forEach((r, i) => { wallMat[i] = std({ map: tx.wall[r.wall], bumpMap: tx.wall[r.wall], bumpScale: 1.2, roughness: 0.88 }); });
   const sideMat = (x, z) => { const ri = world.roomAt(x, z); return ri >= 0 ? wallMat[ri] : M.exterior; };
   for (const p of world.pieces) {
     const w = p.x1 - p.x0, h = p.y1 - p.y0, d = p.z1 - p.z0;
@@ -89,6 +90,15 @@ export function buildHouse(scene, world) {
     mesh.castShadow = mesh.receiveShadow = true;
     scene.add(mesh);
     house.scanMeshes.push(mesh);
+    if (p.y1 >= HOUSE.wallH - 1e-3 && world.roomAt(mx + 0.2, mz + 0.2) !== world.roomIndex('laundry')) {   // crown moulding
+      const ct = HOUSE.wallT + 0.05, ch = 0.07;
+      const cm = new THREE.Mesh(boxGeo(p.along === 'x' ? w : ct, ch, p.along === 'x' ? ct : d, 1), M.frame);
+      cm.position.set(mx, HOUSE.wallH - ch / 2, mz);
+      scene.add(cm);
+      const cm2 = new THREE.Mesh(boxGeo(p.along === 'x' ? w : ct + 0.03, 0.015, p.along === 'x' ? ct + 0.03 : d, 1), M.frame);
+      cm2.position.set(mx, HOUSE.wallH - ch - 0.0075, mz);
+      scene.add(cm2);
+    }
     if (p.y0 === 0) {  // skirting board
       const bh = 0.09, bt = HOUSE.wallT + 0.024;
       const bb = new THREE.Mesh(boxGeo(p.along === 'x' ? w : bt, bh, p.along === 'x' ? bt : d, 1), M.frame);
@@ -185,12 +195,118 @@ export function buildHouse(scene, world) {
       house.leak = leak;
     }
   }
-  // Scratch marks low on the laundry door, hall side.
+  // The laundry door, hall side: scratch marks, four deadbolts (the lowest at robot height), and the dog flap
+  // screwed shut with plywood, light bleeding round it. After it gets out the bottom bolt hangs torn out.
   {
-    const d = world.doors.laundry;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), new THREE.MeshStandardMaterial({ map: scratchTex(), transparent: true, roughness: 0.8, depthWrite: false }));
-    m.position.set(0.42 * (d.hinge === 'from' ? 1 : -1), 0.22, 0.026);
-    house.doors.laundry.pivot.add(m);
+    const d = world.doors.laundry, pv = house.doors.laundry.pivot, L = d.to - d.from, dir = d.hinge === 'from' ? 1 : -1;
+    const scratch = new THREE.MeshStandardMaterial({ map: scratchTex(), transparent: true, roughness: 0.8, depthWrite: false });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), scratch);
+    m.position.set(dir * L * 0.5, 0.56, 0.026);
+    pv.add(m);
+    const brass = std({ color: 0xb08a3a, metalness: 0.85, roughness: 0.35 });
+    const bolt = (y) => {
+      const g = new THREE.Group();
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.075, 0.012), brass);
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.016, 14), brass);
+      cyl.rotation.x = Math.PI / 2; cyl.position.z = 0.012;
+      const slot = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.022, 0.004), M.black);
+      slot.position.z = 0.021;
+      g.add(plate, cyl, slot);
+      g.position.set(dir * (L - 0.09), y, 0.029);
+      pv.add(g);
+      return g;
+    };
+    for (const y of [1.25, 1.55, 1.85]) bolt(y);
+    house.boltIntact = bolt(0.17);
+    // torn out: hanging off one screw, splintered wood behind it
+    const torn = new THREE.Group();
+    const tb = bolt(0.17); pv.remove(tb);
+    tb.position.set(0.018, -0.03, 0.01); tb.rotation.z = dir * 0.9;
+    const splinter = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.12), std({ color: 0xd8c09a, roughness: 1 }));
+    splinter.position.z = 0.0;
+    torn.add(splinter, tb);
+    torn.position.set(dir * (L - 0.09), 0.17, 0.0245);
+    torn.visible = false;
+    pv.add(torn);
+    house.boltTorn = torn;
+    const screws = new THREE.Group();
+    for (let k = 0; k < 4; k++) {
+      const sc = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.0015, 0.03, 6), M.metal);
+      sc.rotation.set(Math.PI / 2, 0, k * 1.7);
+      sc.position.set(12.92 + k * 0.05 + (k % 2) * 0.03, 0.005, 5.18 + (k % 3) * 0.06);
+      screws.add(sc);
+    }
+    screws.visible = false;
+    screws.userData.dynamic = true;
+    scene.add(screws);
+    house.screws = screws;
+    // the dog flap, screwed shut
+    const ply = new THREE.Mesh(boxGeo(0.34, 0.3, 0.015, 0.5), std({ map: tx.furnWood, color: 0xc8b08a, roughness: 0.9 }));
+    ply.position.set(dir * L * 0.5, 0.21, 0.0305);
+    pv.add(ply);
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 1], [0, -1]]) {
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.004, 8), M.metal);
+      s.rotation.x = Math.PI / 2;
+      s.position.set(dir * L * 0.5 + sx * 0.15, 0.21 + sy * 0.13, 0.039);
+      pv.add(s);
+    }
+    house.flapGlow = new THREE.MeshBasicMaterial({ color: 0xffc870 });
+    for (const [w, h, x, y] of [[0.36, 0.008, 0, 0.155], [0.36, 0.008, 0, -0.155], [0.008, 0.32, 0.175, 0], [0.008, 0.32, -0.175, 0]]) {
+      const e = new THREE.Mesh(new THREE.PlaneGeometry(w, h), house.flapGlow);
+      e.position.set(dir * L * 0.5 + x, 0.21 + y, 0.0235);
+      pv.add(e);
+    }
+  }
+  // Theo's door, hall side: a chain on the OUTSIDE, ripped from the jamb. They locked him in at night.
+  {
+    const d = world.doors.kid, pv = house.doors.kid.pivot, L = d.to - d.from, dir = d.hinge === 'from' ? 1 : -1;
+    const brass = std({ color: 0xa08040, metalness: 0.8, roughness: 0.4 });
+    const slide = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.025, 0.01), brass);
+    slide.position.set(dir * (L - 0.13), 1.52, -0.028);
+    pv.add(slide);
+    for (let k = 0; k < 7; k++) {   // the chain hangs straight down from the end of the slide
+      const link = new THREE.Mesh(new THREE.TorusGeometry(0.009, 0.0022, 5, 10), M.metal);
+      link.position.set(dir * (L - 0.075), 1.505 - k * 0.016, -0.034);
+      link.rotation.y = k % 2 ? Math.PI / 2 : 0;
+      pv.add(link);
+    }
+    const stub = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.006), brass);   // the keeper, still on the chain
+    stub.position.set(dir * (L - 0.075), 1.38, -0.034); stub.rotation.z = 0.4;
+    pv.add(stub);
+    const jamb = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.1), std({ color: 0xd8c09a, roughness: 1 }));   // splintered jamb
+    jamb.position.set(d.from - 0.03, 1.52, d.at - HOUSE.wallT / 2 - 0.0165);
+    jamb.rotation.y = Math.PI;
+    scene.add(jamb);
+  }
+  // Claw gouges low on the back door, kitchen side.
+  {
+    const d = world.doors.back, pv = house.doors.back.pivot, dir = d.hinge === 'from' ? 1 : -1;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.3), new THREE.MeshStandardMaterial({ map: scratchTex(), transparent: true, roughness: 0.8, depthWrite: false, color: 0xd0c4b0 }));
+    m.position.set(dir * 0.42, 0.24, 0.026);
+    pv.add(m);
+  }
+  // The pet flap at the end of the hall: just big enough for a robot.
+  if (world.flap) {
+    const f = world.flap, cx = (f.from + f.to) / 2, L = f.to - f.from;
+    const frameMat = std({ color: 0xcfc6b0, roughness: 0.5 });
+    for (const side of [-1, 1]) {
+      const z = f.at + side * (HOUSE.wallT / 2 + 0.006);
+      for (const [w, h, x, y] of [[L + 0.08, 0.04, cx, f.top + 0.02], [0.04, f.top + 0.04, f.from - 0.02, (f.top + 0.04) / 2], [0.04, f.top + 0.04, f.to + 0.02, (f.top + 0.04) / 2]]) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.012), frameMat);
+        m.position.set(x, y, z);
+        scene.add(m);
+      }
+    }
+    const pivot = new THREE.Group();
+    pivot.position.set(cx, f.top - 0.005, f.at);
+    const flap = new THREE.Mesh(new THREE.BoxGeometry(L - 0.01, f.top - 0.02, 0.006), new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.3, transparent: true, opacity: 0.82 }));
+    flap.position.y = -(f.top - 0.02) / 2;
+    pivot.add(flap);
+    pivot.userData.dynamic = true;
+    scene.add(pivot);
+    pivot.updateMatrixWorld(true);
+    house.petFlap = pivot;
+    house.tags.push({ label: 'pet door', box: new THREE.Box3().setFromObject(flap).expandByScalar(0.03), conf: 0.81, obj: flap });
   }
 
   // ---------- furniture ----------
@@ -216,6 +332,38 @@ export function buildHouse(scene, world) {
     Object.assign(house, extra);
   }
 
+  // ---------- contact shadows ----------
+  // Blurred darkness along every wall and around and under the furniture, multiplied onto the floor.
+  {
+    const S = 64, c = document.createElement('canvas');
+    c.width = HOUSE.w * S; c.height = HOUSE.d * S;
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, c.width, c.height);
+    g.filter = `blur(${Math.round(S * 0.16)}px)`;
+    const box = (r, a, grow = 0.02) => { g.fillStyle = `rgba(0,0,0,${a})`; g.fillRect((r.x0 - grow) * S, (r.z0 - grow) * S, (r.x1 - r.x0 + grow * 2) * S, (r.z1 - r.z0 + grow * 2) * S); };
+    for (const p of world.pieces) if (p.y0 < 0.5) box(p, 0.72, 0.05);
+    for (const f of world.furniture) {
+      if (f.info.flat) continue;
+      if (f.info.solid) box(f.rect, 0.7, 0.04);
+      else box(f.rect, f.info.clear < 0.4 ? 0.55 : 0.32, 0.02);   // the dark under beds and sofas
+    }
+    g.filter = 'blur(3px)';
+    for (const f of world.furniture) if (f.info.solid && !f.info.flat) box(f.rect, 0.35, 0.0);   // tight contact line
+    g.filter = 'none';
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    const ao = new THREE.Mesh(new THREE.PlaneGeometry(HOUSE.w, HOUSE.d), new THREE.MeshBasicMaterial({
+      map: t, transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -1.5,
+    }));
+    ao.rotation.x = -Math.PI / 2;
+    ao.position.set(HOUSE.w / 2, 0.0065, HOUSE.d / 2);
+    ao.renderOrder = 1.5;
+    ao.userData.dynamic = true;   // keep out of the static merge: it has its own blending and draw order
+    scene.add(ao);
+  }
+
   // ---------- decals and details ----------
   {  // Theo's drawing on the east wall, low down where only a robot would notice
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.65), new THREE.MeshStandardMaterial({ map: tx.crayon, transparent: true, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
@@ -232,14 +380,70 @@ export function buildHouse(scene, world) {
     scene.add(bowl, food);
     house.tags.push({ label: 'bowl', box: new THREE.Box3().setFromObject(bowl), conf: 0.93, obj: bowl });
   }
-  {  // smoke alarm with a blinking LED
+  {  // smoke alarm, knocked off the ceiling, dangling on its wires and still blinking
+    const X = 5.4, Z = 5.22, Y = HOUSE.wallH - 0.36;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.012, 16), M.white);
+    base.position.set(X, HOUSE.wallH - 0.006, Z);
     const det = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.03, 16), M.white);
-    det.position.set(7, HOUSE.wallH - 0.015, 5.75);
+    det.position.set(X + 0.03, Y, Z + 0.02);
+    det.rotation.set(1.2, 0, 0.35);
+    const wire = (col, ox) => {
+      const a = new THREE.Vector3(X + ox, HOUSE.wallH - 0.01, Z), b = new THREE.Vector3(X + 0.03 + ox * 0.6, Y + 0.05, Z - 0.005);
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, a.distanceTo(b), 4), std({ color: col, roughness: 0.6 }));
+      m.position.copy(a).add(b).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+      scene.add(m);
+    };
+    wire(0xb02020, 0.012); wire(0x111111, -0.012);
     const led = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2020 }));
-    led.position.set(7.03, HOUSE.wallH - 0.032, 5.75);
-    scene.add(det, led);
+    led.position.set(X + 0.03, Y - 0.006, Z + 0.035);
+    scene.add(base, det, led);
     house.smokeLed = led;
   }
+  {  // crayon on the wall under Theo's bed, at robot height: "UNDER HERE HE CANT REACH", and the nights, counted
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.15), new THREE.MeshStandardMaterial({ map: tx.underBed, transparent: true, roughness: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.position.set(3 + HOUSE.wallT / 2 + 0.004, 0.162, 8.9);   // between the skirting and the bed rail
+    m.rotation.y = Math.PI / 2;
+    m.userData.noShadow = true;
+    scene.add(m);
+    house.tags.push({ label: 'writing', box: new THREE.Box3().setFromObject(m).expandByScalar(0.02), conf: 0.44, obj: m });
+  }
+  // Grey scuffs on the tops of the door frames, at the height of something that has to stoop.
+  {
+    const mat = new THREE.MeshStandardMaterial({ map: tx.scuff, transparent: true, depthWrite: false, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 });
+    for (const p of world.lintels) {
+      const w = p.along === 'x' ? p.x1 - p.x0 : p.z1 - p.z0;
+      for (const side of [-1, 1]) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.8, 0.14), mat);
+        if (p.along === 'x') { m.position.set((p.x0 + p.x1) / 2, p.y0 + 0.08, p.at + side * (HOUSE.wallT / 2 + 0.003)); m.rotation.y = side > 0 ? 0 : Math.PI; }
+        else { m.position.set(p.at + side * (HOUSE.wallT / 2 + 0.003), p.y0 + 0.08, (p.z0 + p.z1) / 2); m.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2; }
+        m.userData.noShadow = true;
+        scene.add(m);
+      }
+    }
+  }
+  // Plug-in nightlights: a warm lens and a soft glow on the wall and floor (no real light: lights cost every pixel).
+  house.nightlights = NIGHTLIGHTS.map((n) => {
+    const out = n.facing === 'n' ? [0, -1] : n.facing === 's' ? [0, 1] : n.facing === 'e' ? [1, 0] : [-1, 0];
+    const g = new THREE.Group();
+    g.position.set(n.x, 0, n.z);
+    g.rotation.y = Math.atan2(out[0], out[1]);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.075, 0.03), M.white);
+    body.position.set(0, 0.3, 0.015);
+    const lensMat = new THREE.MeshBasicMaterial({ color: 0xffa850 });
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), lensMat);
+    lens.rotation.x = Math.PI / 2; lens.position.set(0, 0.3, 0.03);
+    const glowMat = (o) => new THREE.MeshBasicMaterial({ map: tx.glow, color: 0xff9a40, transparent: true, opacity: o, depthWrite: false, blending: THREE.AdditiveBlending });
+    const wallGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), glowMat(0.35));
+    wallGlow.position.set(0, 0.3, 0.004);
+    const floorGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.7), glowMat(0.28));
+    floorGlow.rotation.x = -Math.PI / 2; floorGlow.position.set(0, 0.009, 0.3);
+    for (const o of [lens, wallGlow, floorGlow]) o.userData.noShadow = true;
+    g.add(body, lens, wallGlow, floorGlow);
+    g.userData.dynamic = true;
+    scene.add(g);
+    return { x: n.x + out[0] * 0.05, z: n.z + out[1] * 0.05, lensMat, glows: [wallGlow.material, floorGlow.material], alive: true, dying: 0 };
+  });
   for (const r of ROOMS) {  // dead ceiling lights
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.glass.clone());
     lamp.material.opacity = 0.5;
@@ -264,7 +468,6 @@ export function buildHouse(scene, world) {
   point('lamp', 1.8, 6);
   point('tv', 0, 6);
   point('fridge', 0, 5);
-  point('microwave', 0.9, 1.8);
   point('nightlight', 1.8, 3.5);
   {
     const d = world.doors.laundry;
@@ -289,6 +492,7 @@ export function buildHouse(scene, world) {
     p.position.set(0.85, 0.12, 2.75);
     scene.add(p);
     house.lights.cine = p;
+    p.visible = false;
   }
   house.tvStatic = makeStatic();
 
@@ -529,11 +733,17 @@ const BUILDERS = {
     C(g, 0.17, 0.15, 0.58, 0, 0, 0, M.metal, 16);
     C(g, 0.18, 0.18, 0.03, 0, 0.58, 0, M.metal, 16);
   },
-  console(g, w, d, f, M) {
-    legs(g, w, d, 0.76, M.wood, 0.035, 0.02);
-    B(g, w, 0.04, d, 0, 0.76, 0, M.wood);
-    B(g, w - 0.08, 0.1, d - 0.04, 0, 0.66, 0, M.wood);
-    C(g, 0.06, 0.04, 0.22, 0.3, 0.8, 0, M.white);
+  // Hall bench: seat at knee height, open underneath. A robot fits under it; nothing tall does.
+  bench(g, w, d, f, M) {
+    legs(g, w, d, 0.42, M.wood, 0.05, 0.03);
+    B(g, w, 0.045, d, 0, 0.42, 0, M.wood);
+    B(g, w - 0.1, 0.05, 0.02, 0, 0.33, d / 2 - 0.05, M.wood); B(g, w - 0.1, 0.05, 0.02, 0, 0.33, -d / 2 + 0.05, M.wood);
+    B(g, w - 0.08, 0.38, 0.03, 0, 0.465, -d / 2 + 0.015, M.wood);   // back panel against the wall
+    const cushion = new THREE.MeshStandardMaterial({ color: 0x4a3a52, roughness: 1 });
+    B(g, w * 0.55, 0.05, d - 0.08, -w * 0.18, 0.465, 0.02, cushion);
+    // a child's welly boot left on top, and a folded blanket
+    C(g, 0.045, 0.05, 0.2, w * 0.4, 0.465, 0.05, new THREE.MeshStandardMaterial({ color: 0xc8a020, roughness: 0.5 }));
+    B(g, 0.26, 0.06, 0.24, w * 0.19, 0.465, -0.03, M.fabric);
   },
   clock(g, w, d, f, M, tx, house) {
     B(g, w, 0.4, d, 0, 0, 0, M.wood);
@@ -556,11 +766,6 @@ const BUILDERS = {
     g.add(pend);
     return { pendulum: pend };
   },
-  sideTable(g, w, d, f, M) {
-    legs(g, w, d, 0.66, M.wood, 0.035, 0.02);
-    B(g, w, 0.04, d, 0, 0.66, 0, M.wood);
-    C(g, 0.05, 0.07, 0.25, 0, 0.7, 0.05, M.red);
-  },
   coatRack(g, w, d, f, M) {
     C(g, 0.16, 0.17, 0.03, 0, 0, 0, M.wood, 14);
     C(g, 0.02, 0.02, 1.75, 0, 0.03, 0, M.wood);
@@ -569,13 +774,48 @@ const BUILDERS = {
     const hood = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), coat);
     hood.position.set(0.06, 1.65, 0.02);
     g.add(hood);
+    // Biscuit's leash, still clipped to the hook, the collar end empty on the floor
+    const strap = new THREE.MeshStandardMaterial({ color: 0x9a1c1c, roughness: 0.7 });
+    const pts = [[-0.03, 1.55, 0.03], [-0.07, 1.0, 0.07], [-0.09, 0.45, 0.1], [-0.08, 0.02, 0.16], [0.04, 0.01, 0.3], [0.2, 0.01, 0.32], [0.26, 0.01, 0.22]].map((p) => new THREE.Vector3(...p));
+    for (let k = 0; k < pts.length - 1; k++) {
+      const a = pts[k], b = pts[k + 1], L = a.distanceTo(b);
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.018, L, 0.004), strap);
+      s.position.copy(a).add(b).multiplyScalar(0.5);
+      s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+      s.userData.noScan = true;
+      g.add(s);
+    }
+    const clip = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.004, 6, 12), M.metal);
+    clip.rotation.x = Math.PI / 2; clip.position.set(0.27, 0.008, 0.2);
+    clip.userData.noScan = true;
+    g.add(clip);
   },
+  // Clawfoot tub: the body sits on four feet, high enough for a robot to tuck underneath.
   tub(g, w, d, f, M) {
-    B(g, w, 0.55, d, 0, 0, 0, M.white);
-    const inner = B(g, w - 0.12, 0.02, d - 0.12, 0, 0.535, 0, new THREE.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.3 }));
+    const H0 = 0.16, H = 0.44, r = d / 2 - 0.02, core = w - 2 * r * 0.55;
+    const body = (y, h, grow, mat) => {
+      B(g, core, h, d - 0.04 + grow, 0, y, 0, mat);
+      for (const s of [-1, 1]) {
+        const end = new THREE.Mesh(new THREE.CylinderGeometry(r + grow / 2, r + grow / 2 - 0.03, h, 20), mat);
+        end.scale.x = 0.55; end.position.set(s * core / 2, y + h / 2, 0);
+        g.add(end);
+      }
+    };
+    body(H0, H, 0, M.white);
+    body(H0 + H, 0.035, 0.04, M.white);   // rolled rim
+    const inner = B(g, core, 0.01, d - 0.16, 0, H0 + H + 0.03, 0, new THREE.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.3 }));
     inner.userData.noScan = true;
-    C(g, 0.02, 0.02, 0.18, -w / 2 + 0.08, 0.55, 0, M.metal);
+    const brass = new THREE.MeshStandardMaterial({ color: 0x9a7a3a, metalness: 0.85, roughness: 0.35 });
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const fx = sx * (w / 2 - 0.08), fz = sz * (d / 2 - 0.08);
+      C(g, 0.035, 0.02, H0 + 0.02, fx, 0.02, fz, brass, 8);
+      const claw = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), brass);
+      claw.scale.set(1.2, 0.6, 1.2); claw.position.set(fx + sx * 0.01, 0.02, fz + sz * 0.01);
+      g.add(claw);
+    }
+    C(g, 0.015, 0.015, 0.22, -w / 2 + 0.12, H0 + H, 0, brass);
   },
+
   toilet(g, w, d, f, M) {
     B(g, w * 0.6, 0.38, d * 0.55, 0, 0, 0.05, M.white);
     B(g, w * 0.85, 0.06, d * 0.7, 0, 0.38, 0.06, M.white);

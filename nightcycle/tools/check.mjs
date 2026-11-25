@@ -2,7 +2,8 @@
 // Run: node tools/check.mjs   (add --map for an ASCII map of where the robot can go)
 
 import { World, footprintSteps, CELL, GW, GH } from '../src/world.js';
-import { ROOMS, ITEMS, FIRST_WALK, DOCK } from '../src/level.js';
+import { ROOMS, ITEMS, FIRST_WALK, DOCK, NOOKS, PLACES } from '../src/level.js';
+import { kibbleSpots } from '../src/level.js';
 import { T } from '../src/tune.js';
 
 const w = new World();
@@ -47,11 +48,27 @@ const steps = footprintSteps();
 console.log(`  ${steps.length} steps`);
 steps.forEach((s, k) => { if (!nearReach(s.x, s.z, T.cleanRadius + 0.02)) bad(`footprint ${k} at ${s.x.toFixed(2)},${s.z.toFixed(2)} cannot be reached`); });
 
+console.log('Kibble');
+const kb = kibbleSpots();
+kb.forEach((p, k) => { if (!nearReach(p.x, p.z, T.cleanRadius * 0.9)) bad(`kibble ${k} (${p.group}) at ${p.x.toFixed(2)},${p.z.toFixed(2)} cannot be reached`); });
+console.log(`  ${kb.filter((p) => p.group === 'spill').length} spill, ${kb.filter((p) => p.group === 'trail').length} trail`);
+
+console.log('Pet flap and nooks');
+if (!nearReach(PLACES.petFlap[0], PLACES.petFlap[2], 0.05)) bad('the robot cannot get through the pet flap');
+if (w.navFree(PLACES.petFlap[0], PLACES.petFlap[2])) bad('the thing can walk through the pet flap');
+for (const n of NOOKS) {
+  let any = false;
+  for (let z = n.z0; z < n.z1; z += CELL) for (let x = n.x0; x < n.x1; x += CELL) if (w.reach[Math.floor(z / CELL) * GW + Math.floor(x / CELL)]) any = true;
+  if (!any) bad(`nook "${n.name}" cannot be reached by the robot`);
+}
+console.log('Hiding spots');
+console.log('  ' + w.covers.map((c) => c.type).join(', '));
+
 console.log('Entity paths');
 const from = [12.62, 5.6];
 const tryPaths = (label) => {
   ROOMS.forEach((r, ri) => {
-    if (r.id === 'laundry' || (r.id === 'kid' && w.doors.kid.state !== 'open')) return;
+    if (r.id === 'laundry' || (r.id === 'kid' && w.doors.kid.state !== 'open') || (r.id === 'master' && w.doors.master.state !== 'open')) return;
     const p = w.randomFreeIn(ri, mulberry(ri + 1));
     if (!p) { bad(`${label}: no free spot in ${r.id}`); return; }
     const path = w.findPath(from[0], from[1], p[0], p[1]);
@@ -61,11 +78,15 @@ const tryPaths = (label) => {
 tryPaths('kid door closed');
 w.setDoor('kid', 'open');
 tryPaths('kid door open');
+w.setDoor('master', 'open');
+tryPaths('master door open');
 for (let k = 0; k < FIRST_WALK.length - 1; k++) {
   const [a, b] = [FIRST_WALK[k], FIRST_WALK[k + 1]];
   if (k > 0 && !w.navLine(a[0], a[1], b[0], b[1])) bad(`first walk leg ${k} is blocked`);
 }
 w.setDoor('kid', 'closed');
+w.setDoor('master', 'closed');
+
 
 function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 

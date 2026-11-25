@@ -155,11 +155,15 @@ export class Audio {
     const on = live && !r.dead;
     const sp = Math.min(1, Math.abs(r.v) / 1.3 + Math.abs(r.w) * 0.15);
     const sucking = on && r.suction && r.bin < 100;
-    m.drive.gain.setTargetAtTime(on ? 0.05 + sp * 0.22 : 0, t, 0.08);
-    m.hum.gain.setTargetAtTime(on ? 0.012 + sp * 0.03 : 0, t, 0.08);
+    // A hush: the motor and the house drop away for a moment when you first lay eyes on it.
+    const hush = this.hushUntil && t < this.hushUntil ? 0.06 : 1;
+    const floor = r.floorNoise ?? 1;
+    m.drive.gain.setTargetAtTime(on ? (0.05 + sp * 0.22) * hush * (0.6 + 0.4 * floor) : 0, t, hush < 1 ? 0.05 : 0.08);
+    m.hum.gain.setTargetAtTime(on ? (0.012 + sp * 0.03) * hush : 0, t, 0.08);
     m.osc.frequency.setTargetAtTime(80 + sp * 40, t, 0.1);
-    m.suck.gain.setTargetAtTime(sucking ? 0.05 : 0, t, 0.15);
-    m.whine.gain.setTargetAtTime(sucking ? 0.006 : 0, t, 0.15);
+    m.suck.gain.setTargetAtTime(sucking ? 0.05 * hush : 0, t, 0.15);
+    m.whine.gain.setTargetAtTime(sucking ? 0.006 * hush : 0, t, 0.15);
+    this.amb.gain.setTargetAtTime(hush, t, hush < 1 ? 0.05 : 0.6);
     // grit rattling up the intake
     if (sucking && r.dirtRate > 3 && Math.random() < dt * Math.min(40, r.dirtRate * 0.6)) {
       const n = this.noise(), hp = this.filter('highpass', 2500 + Math.random() * 3000), gg = this.gain();
@@ -270,7 +274,13 @@ export class Audio {
     }
   }
 
+  hush(secs = 1.5) { if (this.ctx) this.hushUntil = this.now() + secs; }
+
+  // Sounds the caption log can describe.
+  cap(label, x, z) { this.game.onSound?.(label, x, z); }
+
   footstep(x, z, loud = 1) {
+    this.cap('footsteps', x, z);
     if (!this.ctx) return;
     const t = this.now(), dest = this.spot(x, 0.05, z, { verb: 0.6, roll: 0.9 });
     const o = this.osc('sine', 78), g = this.gain();
@@ -286,6 +296,7 @@ export class Audio {
   }
 
   creak(x, y, z, dur = 0.8, vol = 0.6) {
+    if (vol > 0.4) this.cap('creak', x, z);
     if (!this.ctx) return;
     const t = this.now(), dest = this.spot(x, y, z, { verb: 0.7 });
     const o = this.osc('sawtooth', 200), bp = this.filter('bandpass', 900 + Math.random() * 500, 14), g = this.gain();
@@ -297,6 +308,7 @@ export class Audio {
   }
 
   doorCreak(x, z, dur = 2.4) {
+    this.cap('door creaks', x, z);
     if (!this.ctx) return;
     const t = this.now(), dest = this.spot(x, 1, z, { verb: 0.8, occlude: false });
     for (const base of [190, 285]) {
@@ -309,7 +321,8 @@ export class Audio {
     }
   }
 
-  doorSlam(x, z, vol = 1) {
+  doorSlam(x, z, vol = 1, caption = true) {
+    if (caption) this.cap('door slams', x, z);
     if (!this.ctx) return;
     const t = this.now(), dest = this.spot(x, 1, z, { verb: 1 });
     const o = this.osc('sine', 90), g = this.gain();
@@ -323,9 +336,89 @@ export class Audio {
     n.start(t); n.stop(t + 0.4);
   }
 
-  knock(x, z, n = 3) {
+  knock(x, z, n = 3, gap = 380, vol = 0.45) {
+    this.cap('knocking', x, z);
     if (!this.ctx) return;
-    for (let k = 0; k < n; k++) setTimeout(() => this.doorSlam(x, z, 0.45), k * 380 + Math.random() * 60);
+    for (let k = 0; k < n; k++) setTimeout(() => this.doorSlam(x, z, vol, false), k * gap + Math.random() * 60);
+  }
+
+  // Its neck: a quick run of wet cracks as the head snaps round.
+  crack(x, y, z) {
+    this.cap('a crack', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, y, z, { verb: 0.5, roll: 0.8 });
+    for (let k = 0; k < 4; k++) {
+      const tt = t + k * (0.025 + Math.random() * 0.02);
+      const n = this.noise(), bp = this.filter('bandpass', 900 + Math.random() * 1600, 4), g = this.gain();
+      n.connect(bp).connect(g).connect(dest);
+      this.env(g, tt, 0.001, 0.9 - k * 0.15, 0.025);
+      n.start(tt, Math.random()); n.stop(tt + 0.05);
+    }
+    const o = this.osc('sine', 140), og = this.gain();
+    o.frequency.exponentialRampToValueAtTime(60, t + 0.08);
+    o.connect(og).connect(dest);
+    this.env(og, t, 0.002, 0.5, 0.08);
+    o.start(t); o.stop(t + 0.12);
+  }
+
+  // A long breath out. It has lost you (or given up for now).
+  huff(x, y, z, v = 1) {
+    this.cap('a long breath out', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, y, z, { verb: 0.7, roll: 0.9 });
+    const n = this.noise(this.white, true), bp = this.filter('bandpass', 520, 0.8), g = this.gain();
+    bp.frequency.setValueAtTime(700, t); bp.frequency.exponentialRampToValueAtTime(300, t + 1.6);
+    n.connect(bp).connect(g).connect(dest);
+    this.env(g, t, 0.25, 0.45 * v, 1.4, 0.2);
+    n.start(t); n.stop(t + 2.1);
+    const o = this.osc('sawtooth', 62), lp = this.filter('lowpass', 180), og = this.gain();
+    o.connect(lp).connect(og).connect(dest);
+    this.env(og, t, 0.3, 0.12 * v, 1.2);
+    o.start(t); o.stop(t + 1.8);
+  }
+
+  // Fingernails dragging on the floor.
+  scrape(x, z, v = 1) {
+    this.cap('scratching on the floor', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, 0.02, z, { verb: 0.3, roll: 1 });
+    const n = this.noise(), bp = this.filter('bandpass', 2600 + Math.random() * 1500, 6), g = this.gain();
+    bp.frequency.exponentialRampToValueAtTime(1500, t + 0.09);
+    n.connect(bp).connect(g).connect(dest);
+    this.env(g, t, 0.005, 0.35 * v, 0.08);
+    n.start(t, Math.random()); n.stop(t + 0.12);
+  }
+
+  // Dog food going up the intake.
+  crunch(v = 1) {
+    if (!this.ctx) return;
+    const t = this.now();
+    for (let k = 0; k < 5; k++) {
+      const tt = t + Math.random() * 0.12;
+      const n = this.noise(), bp = this.filter('bandpass', 1800 + Math.random() * 2500, 3), g = this.gain();
+      n.connect(bp).connect(g).connect(this.sfx);
+      this.env(g, tt, 0.001, 0.22 * v, 0.03);
+      n.start(tt, Math.random()); n.stop(tt + 0.05);
+    }
+    const o = this.osc('sine', 110), og = this.gain();
+    o.connect(og).connect(this.sfx);
+    this.env(og, t, 0.002, 0.18 * v, 0.06);
+    o.start(t); o.stop(t + 0.1);
+  }
+
+  // A nightlight shorting out.
+  pop(x, y, z) {
+    this.cap('a light shorting out', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, y, z, { verb: 0.4 });
+    const o = this.osc('square', 118), g = this.gain();
+    o.connect(g).connect(dest);
+    this.env(g, t, 0.002, 0.12, 0.25, 0.15);
+    o.start(t); o.stop(t + 0.5);
+    const n = this.noise(), hp = this.filter('highpass', 3000), ng = this.gain();
+    n.connect(hp).connect(ng).connect(dest);
+    this.env(ng, t + 0.3, 0.001, 0.3, 0.04);
+    n.start(t + 0.3); n.stop(t + 0.4);
   }
 
   wind(x, z, dur = 4) {
@@ -421,7 +514,9 @@ export class Audio {
   }
 
   musicBox(on, pos) {
+    if (on && !this.mb) this.cap('a music box', pos[0], pos[2]);
     if (!this.ctx) return;
+
     if (on && !this.mb) this.mb = { pos, idx: 0, next: this.now() + 0.2, rate: 0.42, slow: false };
     if (!on) this.mb = null;
   }

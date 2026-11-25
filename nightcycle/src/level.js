@@ -42,6 +42,7 @@ export const WALLS = [
     { kind: 'door', from: 1.0, to: 1.85, door: 'bath' },
     { kind: 'door', from: 5.0, to: 5.85, door: 'kid' },
     { kind: 'door', from: 9.4, to: 10.25, door: 'master' },
+    { kind: 'flap', from: 13.45, to: 13.9, top: 0.25 },   // the pet flap: a robot fits, it doesn't
   ] },
   { along: 'z', at: 6, from: 0, to: 5, openings: [{ kind: 'arch', from: 1.2, to: 2.8, top: 2.2 }] },
   { along: 'z', at: 11, from: 0, to: 5, openings: [] },
@@ -57,12 +58,13 @@ export const DOORS = {
   laundry: { state: 'locked', hinge: 'from', swing: -1 },
   bath:    { state: 'open',   hinge: 'from', swing: 1 },
   kid:     { state: 'closed', hinge: 'to',   swing: 1 },
-  master:  { state: 'open',   hinge: 'from', swing: 1 },
+  master:  { state: 'closed', hinge: 'from', swing: 1 },   // swings open as it first walks past
 };
 
 // How each kind of furniture behaves. solid: blocks the robot over its whole footprint.
 // legs: only its four legs block the robot; clear is the gap underneath.
-// cover: the robot is hidden while under it. los: tall enough to block sight.
+// cover: the robot is hidden while under it. los: tall enough to block sight. h: height, which also decides
+// whether it hides a robot tucked right behind it (World.losLow).
 export const FTYPES = {
   dock:        { solid: true, h: 0.12 },
   bookshelf:   { solid: true, h: 1.9, los: true },
@@ -78,11 +80,10 @@ export const FTYPES = {
   counter:     { solid: true, h: 0.92, los: true },
   fridge:      { solid: true, h: 1.85, los: true },
   trash:       { solid: true, h: 0.6 },
-  console:     { legs: true, clear: 0.72, h: 0.8 },
   clock:       { solid: true, h: 2.0, los: true },
-  sideTable:   { legs: true, clear: 0.55, h: 0.7 },
+  bench:       { legs: true, clear: 0.14, cover: true, h: 0.46 },
   coatRack:    { solid: true, h: 1.8 },
-  tub:         { solid: true, h: 0.55 },
+  tub:         { legs: true, clear: 0.16, cover: true, h: 0.62 },   // clawfoot
   toilet:      { solid: true, h: 0.75 },
   sink:        { solid: true, h: 0.85 },
   kidBed:      { legs: true, clear: 0.24, cover: true, h: 0.55 },
@@ -137,9 +138,10 @@ export const FURNITURE = [
   // Hallway
   { type: 'rug', x0: 1.0, z0: 5.45, x1: 12.6, z1: 6.05, color: '#3b2f4a' },
   { type: 'coatRack', x0: 0.25, z0: 5.08, x1: 0.6, z1: 5.42, label: 'coat rack' },
-  { type: 'console', x0: 3.6, z0: 5.06, x1: 4.6, z1: 5.38, facing: 's', label: 'table' },
   { type: 'clock', x0: 7.0, z0: 5.06, x1: 7.45, z1: 5.45, facing: 's', label: 'clock' },
-  { type: 'sideTable', x0: 13.5, z0: 5.5, x1: 13.94, z1: 6.1, label: 'table' },
+  { type: 'bench', x0: 10.5, z0: 5.07, x1: 11.7, z1: 5.52, facing: 's', label: 'bench' },
+  { type: 'boxes', x0: 2.3, z0: 6.2, x1: 2.85, z1: 6.44, stack: 2, text: 'BATHROOM' },
+  { type: 'boxes', x0: 8.45, z0: 6.2, x1: 9.05, z1: 6.44, stack: 3, text: 'FRAGILE' },
 
   // Bathroom
   { type: 'tub', x0: 0.06, z0: 9.2, x1: 1.75, z1: 9.94, label: 'bathtub' },
@@ -149,7 +151,7 @@ export const FURNITURE = [
 
   // Theo's room
   { type: 'kidBed', x0: 3.06, z0: 7.8, x1: 4.1, z1: 9.94, facing: 'n', label: 'bed' },
-  { type: 'toyChest', x0: 6.4, z0: 9.4, x1: 7.3, z1: 9.94, facing: 'n', label: 'chest' },
+  { type: 'toyChest', x0: 3.9, z0: 6.56, x1: 4.8, z1: 7.1, facing: 's', label: 'chest' },
   { type: 'desk', x0: 6.85, z0: 6.9, x1: 7.44, z1: 7.8, facing: 'w', label: 'desk' },
   { type: 'chair', x0: 6.35, z0: 7.15, x1: 6.78, z1: 7.58, facing: 'e', small: true, label: 'chair' },
   { type: 'boxes', x0: 4.3, z0: 9.45, x1: 4.75, z1: 9.9, stack: 1, text: "THEO'S TOYS" },
@@ -160,7 +162,7 @@ export const FURNITURE = [
   { type: 'nightstand', x0: 9.5, z0: 9.45, x1: 9.95, z1: 9.94, facing: 'n' },
   { type: 'nightstand', x0: 12.05, z0: 9.45, x1: 12.5, z1: 9.94, facing: 'n' },
   { type: 'wardrobe', x0: 7.56, z0: 7.3, x1: 8.2, z1: 9.1, facing: 'e', label: 'wardrobe' },
-  { type: 'dresser', x0: 12.2, z0: 6.56, x1: 13.6, z1: 7.02, facing: 's', sheet: true, label: 'dresser' },
+  { type: 'dresser', x0: 12.0, z0: 6.56, x1: 13.3, z1: 7.02, facing: 's', sheet: true, label: 'dresser' },
   { type: 'armchair', x0: 8.4, z0: 9.15, x1: 9.15, z1: 9.9, facing: 'n', sheet: true, label: 'chair' },
   { type: 'boxes', x0: 13.2, z0: 9.2, x1: 13.85, z1: 9.85, stack: 3, text: 'BEDROOM' },
 ];
@@ -206,8 +208,23 @@ export const ITEMS = [
 // Muddy bare feet, from the back door to Theo's door.
 export const FOOTPRINT_PATH = [[10.0, 0.3], [9.85, 1.4], [9.32, 2.0], [9.32, 3.6], [8.45, 4.3], [8.45, 5.75], [5.43, 5.75], [5.43, 6.38]];
 
-// The thing walks this way the first time you see it: out of the laundry, down the hall, into the bathroom.
-export const FIRST_WALK = [[12.62, 4.55], [12.62, 5.9], [1.42, 5.9], [1.42, 7.8]];
+// The thing walks this way the first time you see it: out of the laundry, down the hall, a stop in Theo's
+// doorway, then on into the bathroom. It waits at HOLD until you can see the doorway.
+export const FIRST_WALK = [[12.62, 4.55], [12.62, 5.84], [6.3, 5.84], [5.43, 6.0], [1.42, 5.84], [1.42, 7.8]];
+export const FIRST_WALK_HOLD = 2;   // index of the point where it waits
+export const FIRST_WALK_DOOR = 3;   // index of the point where it stops in the doorway, facing in
+
+// Places its body can never get close to, whatever the walking grid says.
+export const NOOKS = [
+  { x0: 6.9, z0: 6.95, x1: 7.44, z1: 7.75, name: "under Theo's desk" },
+  { x0: 13.45, z0: 6.3, x1: 13.9, z1: 6.7, name: 'the pet flap' },
+];
+
+// Plug-in nightlights (fake glow, no real light). facing: the direction the wall faces.
+export const NIGHTLIGHTS = [
+  { x: 0.78, z: 6.44, facing: 'n' },   // by the bathroom door, hall side
+  { x: 7.78, z: 4.94, facing: 'n' },   // by the kitchen arch, kitchen side
+];
 
 export const DOCK = { x: 0.4, z: 2.4, yaw: -Math.PI / 2 };
 
@@ -215,7 +232,6 @@ export const LIGHTS = {
   lamp:       { x: 4.7, y: 1.5, z: 3.5, color: 0xffb070 },
   tv:         { x: 3.2, y: 0.8, z: 0.75, color: 0x9fb8ff },
   fridge:     { x: 9.9, y: 1.0, z: 3.57, color: 0xdff2ff },
-  microwave:  { x: 6.85, y: 1.05, z: 0.6, color: 0x33ff88 },
   nightlight: { x: 3.18, y: 0.22, z: 7.4, color: 0xff9a40 },
 };
 
@@ -224,8 +240,34 @@ export const PLACES = {
   tv: [3.2, 0.7, 0.4],
   clock: [7.22, 1.5, 5.3],
   fridge: [10.2, 1.0, 3.57],
-  musicBox: [6.85, 0.5, 9.65],
+  musicBox: [4.35, 0.5, 6.8],
   laundryDoor: [12.62, 1.0, 5.0],
   backDoor: [10.0, 1.0, 0.0],
   kidDoor: [5.43, 1.0, 6.5],
+  masterDoor: [9.82, 1.0, 6.5],
+  petFlap: [13.675, 0.1, 6.5],
+  bowl: [7.0, 0.05, 4.65],
 };
+
+// Dog food. The trail runs from the (freshly filled) bowl to the laundry door: someone still feeds it.
+// The spill fans out from under the laundry door once it is open, and is a spot-clean task. Both crunch.
+export function kibbleSpots() {
+  let a = 77;
+  const rnd = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const out = [];
+  const trail = [[7.2, 4.6], [8.45, 4.55], [8.45, 5.35], [9.6, 5.62], [12.0, 5.62], [12.45, 5.25]];
+  for (let k = 0; k < trail.length - 1; k++) {
+    const [ax, az] = trail[k], [bx, bz] = trail[k + 1], L = Math.hypot(bx - ax, bz - az);
+    for (let s = 0; s < L; s += 0.22) {
+      if (rnd() < 0.3) continue;
+      const t = s / L;
+      out.push({ x: ax + (bx - ax) * t + (rnd() - 0.5) * 0.12, z: az + (bz - az) * t + (rnd() - 0.5) * 0.12, group: 'trail' });
+    }
+  }
+  for (let k = 0; k < 26; k++) {
+    const ang = (rnd() - 0.5) * 2.6, d = 0.18 + Math.pow(rnd(), 0.7) * 0.95;
+    const x = Math.min(13.8, Math.max(11.9, 12.62 + Math.sin(ang) * d * 1.3)), z = Math.min(6.3, Math.max(5.2, 5.1 + Math.cos(ang) * d));
+    out.push({ x, z, group: 'spill' });
+  }
+  return out;
+}

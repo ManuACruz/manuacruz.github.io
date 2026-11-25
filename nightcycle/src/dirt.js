@@ -47,6 +47,33 @@ export class DirtLayer {
       return { ...s, mesh: m, amount: 0, shown: false };
     });
     this.timer = 0;
+
+    // Its muddy footprints in the hall: a pool of decals that fade as you clean the floor under them.
+    this.mud = [];
+    this.mudNext = 0;
+    for (let k = 0; k < 48; k++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.165), new THREE.MeshStandardMaterial({
+        map: game.house.tx.footprint, color: 0x5a3a22, transparent: true, depthWrite: false, roughness: 0.6, opacity: 0,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      }));
+      m.rotation.order = 'YXZ';
+      m.renderOrder = 2;
+      m.visible = false;
+      game.scene.add(m);
+      this.mud.push({ mesh: m, x: 0, z: 0, on: false });
+    }
+  }
+
+  clearMud() { for (const d of this.mud) { d.on = false; d.mesh.visible = false; } }
+
+  addMud(x, z, dx, dz, left) {
+    const d = this.mud[this.mudNext];
+    this.mudNext = (this.mudNext + 1) % this.mud.length;
+    Object.assign(d, { x, z, on: true });
+    d.mesh.rotation.set(-Math.PI / 2, Math.atan2(-dz, dx), 0);
+    d.mesh.scale.y = left ? 1 : -1;
+    d.mesh.position.set(x, 0.0075, z);
+    d.mesh.visible = true;
   }
 
   // Copy changed cells into the texture (rows flipped: the plane's v runs north to south).
@@ -67,6 +94,13 @@ export class DirtLayer {
   update(dt) {
     this.timer -= dt;
     if (this.timer <= 0 && this.game.world.dirtBox) { this.timer = 1 / 20; this.flush(); }
+    const w = this.game.world;
+    for (const d of this.mud) {
+      if (!d.on) continue;
+      const v = w.dirt[Math.floor(d.z * 16) * GW + Math.floor(d.x * 16)] || 0;
+      d.mesh.material.opacity = Math.min(0.85, Math.max(0, (v - 0.05) * 1.8));
+      if (v < 0.05) { d.on = false; d.mesh.visible = false; }
+    }
     const r = this.game.roomba;
     for (const p of this.prints) {
       if (!p.shown || p.amount <= 0) continue;

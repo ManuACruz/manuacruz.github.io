@@ -1,13 +1,15 @@
 // Settings: stored in localStorage when it is available, defaults otherwise.
 
-const KEY = 'nightcycle.settings.v1';
-const DEFAULTS = { volume: 0.8, sensitivity: 1, pixel: 2.5, brightness: 1, voice: true, labels: true, invert: false, difficulty: 1 };
+const KEY = 'nightcycle.settings.v2';
+const coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+const DEFAULTS = { volume: 0.8, sensitivity: 1, pixel: coarse ? 1.5 : 1, brightness: 1, voice: true, labels: true, invert: false, difficulty: 1,
+  flashing: true, captions: false, mudMarkers: true, textSize: 1 };
 
 // How sharp its senses are and how fast it runs, per difficulty.
 export const DIFFICULTY = {
-  0.7: { sight: 0.7, hearing: 0.65, chase: 0.88, battery: 0.75 },
-  1: { sight: 1, hearing: 1, chase: 1, battery: 1 },
-  1.3: { sight: 1.2, hearing: 1.25, chase: 1.08, battery: 1.15 },
+  0.7: { name: 'Easy', sight: 0.7, hearing: 0.65, chase: 0.88, battery: 0.75, dockSave: true, desc: 'Duller senses, slower chase, longer battery. Docking saves.' },
+  1: { name: 'Normal', sight: 1, hearing: 1, chase: 1, battery: 1, dockSave: true, desc: 'As intended. Docking saves your progress.' },
+  1.3: { name: 'Hard', sight: 1.2, hearing: 1.25, chase: 1.08, battery: 1.15, dockSave: false, desc: 'Sharper senses, faster chase. Only task checkpoints.' },
 };
 
 export function loadSettings() {
@@ -22,9 +24,13 @@ const ROWS = [
   { key: 'volume', label: 'Volume', type: 'range', min: 0, max: 1, step: 0.05, fmt: (v) => Math.round(v * 100) + '%' },
   { key: 'brightness', label: 'Brightness', type: 'range', min: 0.6, max: 2, step: 0.05, fmt: (v) => v.toFixed(2) },
   { key: 'sensitivity', label: 'Look sensitivity', type: 'range', min: 0.3, max: 2.5, step: 0.05, fmt: (v) => v.toFixed(2) },
-  { key: 'pixel', label: 'Pixel size', type: 'choice', options: [[1.5, 'Fine'], [2, 'Small'], [2.5, 'Medium'], [3, 'Large'], [4, 'Chunky']] },
+  { key: 'pixel', label: 'Camera', type: 'choice', options: [[1, 'HD'], [1.5, 'HD (faster)'], [2.5, 'Retro'], [4, 'Retro chunky']] },
+  { key: 'textSize', label: 'Text size', type: 'choice', options: [[1, 'Normal'], [1.2, 'Large'], [1.45, 'Larger']] },
   { key: 'voice', label: 'Robot voice', type: 'toggle' },
   { key: 'labels', label: 'Object recognition', type: 'toggle' },
+  { key: 'mudMarkers', label: 'Dirt markers', type: 'toggle' },
+  { key: 'captions', label: 'Sound captions', type: 'toggle' },
+  { key: 'flashing', label: 'Flashing effects', type: 'toggle' },
   { key: 'invert', label: 'Invert look', type: 'toggle' },
 ];
 

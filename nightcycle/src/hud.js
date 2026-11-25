@@ -16,8 +16,10 @@ export class Hud {
       clock: $('clock'), suction: $('k-suction'), light: $('k-light'), scan: $('k-scan'), room: $('room-name'),
       task: $('task'), taskTitle: $('task-title'), taskBar: $('task-bar'), taskPct: $('task-pct'),
       notes: $('notes'), sub: $('subtitle'), hint: $('hint'), card: $('card'), motion: $('motion'), motionD: $('motion-d'),
-      map: $('map'), labels: $('labels'), status: $('status-line'), hidden: $('hidden-tag'),
+      map: $('map'), labels: $('labels'), status: $('status-line'), hidden: $('hidden-tag'), sensor: $('sensor-line'),
     };
+    this.motionHist = []; this.motionSample = 0; this.motionShow = 0;
+    this.route = null; this.routeTimer = 0;
     this.mapCtx = this.el.map.getContext('2d');
     this.mapImg = this.mapCtx.createImageData(GW, GH);
     this.lab = this.el.labels.getContext('2d');
@@ -30,8 +32,11 @@ export class Hud {
   }
 
   resize() {
-    const c = this.el.labels;
-    c.width = innerWidth; c.height = innerHeight;
+    const c = this.el.labels, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    c.width = Math.round(innerWidth * dpr); c.height = Math.round(innerHeight * dpr);
+    c.style.width = innerWidth + 'px'; c.style.height = innerHeight + 'px';
+    this.lab.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.W = innerWidth; this.H = innerHeight;
   }
 
   show(on) {
@@ -56,6 +61,7 @@ export class Hud {
     if (kind === 'app') this.game.audio.chime();
   }
   log(text) { this.notify('', text, 'sys'); }
+  caption(text) { this.notify('', text, 'sys cap'); }
 
   subtitle(text, secs = 4) {
     this.el.sub.textContent = text;
@@ -96,18 +102,28 @@ export class Hud {
     this.hintTimer -= dt; if (this.hintTimer <= 0) this.el.hint.classList.remove('on');
     this.cardTimer -= dt; if (this.cardTimer <= 0) this.el.card.classList.remove('on');
 
-    // proximity sensor
+    // Motion sensor: it only registers it while it moves. Direction and trend, not distance.
     const e = g.entity;
     const d = e.root.visible && e.state !== 'dormant' ? Math.hypot(e.x - r.x, e.z - r.z) : Infinity;
-    const close = d < 6 && g.state === 'playing';
-    this.el.motion.classList.toggle('on', close);
-    if (close) {
-      this.el.motionD.textContent = d.toFixed(1) + ' m';
+    this.motionSample -= dt;
+    if (this.motionSample <= 0) { this.motionSample = 0.25; this.motionHist.push(d); if (this.motionHist.length > 4) this.motionHist.shift(); }
+    const sensed = d < 7 && e.moving && g.state === 'playing';
+    this.motionShow = sensed ? 0.6 : Math.max(0, this.motionShow - dt);
+    const show = this.motionShow > 0;
+    this.el.motion.classList.toggle('on', show);
+    if (sensed) {
+      const dx = e.x - r.x, dz = e.z - r.z;
+      const f = dx * r.fx + dz * r.fz, rt = -dx * r.fz + dz * r.fx, ang = Math.atan2(rt, f);
+      const dir = Math.abs(ang) < 0.6 ? '▲ AHEAD' : Math.abs(ang) > 2.3 ? '▼ BEHIND' : ang > 0 ? '► RIGHT' : '◄ LEFT';
+      const closing = this.motionHist.length >= 4 && this.motionHist[0] - d > 0.25;
+      const bars = d < 2 ? 4 : d < 3.5 ? 3 : d < 5 ? 2 : 1;
+      this.el.motionD.textContent = `${dir}${closing ? ' · CLOSING' : ''}  ${'▮'.repeat(bars)}${'▯'.repeat(4 - bars)}`;
       this.el.motion.classList.toggle('alert', e.state === 'chase');
       this.beepTimer -= dt;
-      if (this.beepTimer <= 0) { this.beepTimer = 0.15 + (d / 6) * 0.9; g.audio.beep(1 - d / 8); }
+      if (this.beepTimer <= 0) { this.beepTimer = 0.15 + (d / 7) * 0.9; g.audio.beep(1 - d / 9); }
     }
-    g.post.uniforms.danger.value += ((e.state === 'chase' && g.state === 'playing' ? 0.8 : close ? (1 - d / 6) * 0.35 : 0) - g.post.uniforms.danger.value) * Math.min(1, dt * 3);
+    const danger = g.state !== 'playing' ? 0 : e.state === 'chase' ? 0.8 : e.state === 'reach' ? 0.9 : sensed ? (1 - d / 7) * 0.35 : 0;
+    g.post.uniforms.danger.value += (danger - g.post.uniforms.danger.value) * Math.min(1, dt * 3);
 
     this.timer -= dt;
     if (this.timer <= 0) {
@@ -115,12 +131,13 @@ export class Hud {
       const b = Math.max(0, r.battery);
       this.el.batt.style.width = b + '%';
       this.el.battPct.textContent = Math.ceil(b) + '%';
+      const mins = r.docked ? null : r.minutesLeft;
+      this.el.sensor.textContent = `SURFACE ${r.floorName}${r.floorNoise < 0.8 ? ' · QUIET' : r.floorNoise > 1.2 ? ' · LOUD' : ''}` + (mins != null ? `   BATT ~${mins < 1 ? '<1' : Math.floor(mins)} MIN` : '');
       this.el.batt.parentElement.classList.toggle('low', b < T.batteryLow);
       this.el.bin.style.width = r.bin + '%';
       this.el.binPct.textContent = r.bin >= 100 ? 'FULL' : Math.floor(r.bin) + '%';
       this.el.bin.parentElement.classList.toggle('low', r.bin >= 90);
-      const mins = Math.floor(g.clock), hh = 3 + Math.floor(mins / 60), mm = mins % 60;
-      this.el.clock.textContent = `0${hh}:${String(mm).padStart(2, '0')} AM`;
+      this.el.clock.textContent = g.clockText();
       this.el.suction.classList.toggle('off', !r.suction);
       this.el.light.classList.toggle('off', !r.light);
       this.el.scan.classList.toggle('off', r.scanTimer > 0);
@@ -129,8 +146,8 @@ export class Hud {
       if (ri >= 0) { this.explored.add(ri); this.el.room.textContent = ROOMS[ri].name.toUpperCase(); }
       this.el.hidden.classList.toggle('on', r.hidden);
       this.el.hidden.textContent = r.outOfReach ? 'OUT OF REACH' : 'UNDER COVER';
-      let st = r.docked ? 'DOCKED · CHARGING' : r.bin >= 100 ? 'BIN FULL · RETURN TO BASE' : r.battery < T.batteryLow ? 'LOW BATTERY'
-        : !r.suction ? 'SILENT DRIVE' : r.dirtRate > 15 ? 'DIRT DETECTED ▮▮▮' : r.dirtRate > 4 ? 'DIRT DETECTED ▮▯▯' : 'CLEANING';
+      let st = r.remote > 0 ? 'REMOTE SESSION · APP IN CONTROL' : r.docked ? 'DOCKED · CHARGING' : r.bin >= 100 ? 'BIN FULL · RETURN TO BASE' : r.battery < T.batteryLow ? 'LOW BATTERY · RETURN TO BASE'
+        : !r.suction ? 'QUIET MODE · NOT CLEANING' : r.dirtRate > 15 ? 'DIRT DETECTED ▮▮▮' : r.dirtRate > 4 ? 'DIRT DETECTED ▮▯▯' : 'CLEANING';
       this.el.status.textContent = st;
       const task = g.story.task;
       if (task && task.progress) {
@@ -140,9 +157,23 @@ export class Hud {
       } else { this.el.taskBar.style.width = '0%'; this.el.taskPct.textContent = ''; }
     }
 
+    // the way home, on the map, when you need it
+    this.routeTimer -= dt;
+    if (this.routeTimer <= 0) {
+      this.routeTimer = 1;
+      const need = !r.docked && (r.battery < 25 || r.bin >= 90);
+      this.route = need ? g.world.findPath(r.x, r.z, DOCK.x + 0.15, DOCK.z) : null;
+    }
+
     this.mapTimer -= dt;
     if (this.mapTimer <= 0) { this.mapTimer = 0.25; this.drawMap(); }
     this.drawLabels();
+  }
+
+  // Key names for the device in use.
+  setPrompts(pad) {
+    const k = pad ? { suction: 'X', light: 'Y', scan: 'A' } : { suction: 'E', light: 'F', scan: 'SPACE' };
+    for (const id of ['suction', 'light', 'scan']) this.el[id].querySelector('kbd').textContent = k[id];
   }
 
   // The app-style cleaning map: swept floor glows, unswept floor in explored rooms is dim.
@@ -157,8 +188,8 @@ export class Hud {
       if (ri === lair && this.explored.has(ri)) { R = 120; G = 10; B = 10; a = 90 + 80 * pulse; }
       else if (ri >= 0 && this.explored.has(ri) && w.reach[c]) {
         if (w.swept[c]) { R = 40; G = 190; B = 230; a = 200; }
-        else { R = 30; G = 60; B = 80; a = 150; }
-        if (w.dirt[c] > 0.15) { R = 90; G = 80; B = 60; a = 170; }
+        else { R = 22; G = 44; B = 70; a = 150; }
+        if (w.dirt[c] > 0.15) { R = 205; G = 120; B = 40; a = 190; }
         if (ri === taskRoom) a = Math.min(255, a + 40 * pulse);
       }
       img[o] = R; img[o + 1] = G; img[o + 2] = B; img[o + 3] = a;
@@ -168,7 +199,7 @@ export class Hud {
     const s = 1 / CELL;
     ctx.fillStyle = 'rgba(160,220,255,0.75)';
     for (const p of w.pieces) {
-      if (p.y0 > 0.5) continue;
+      if (p.y0 > 0.2) continue;
       const ri = w.roomAt((p.x0 + p.x1) / 2 + 0.2, (p.z0 + p.z1) / 2 + 0.2), rj = w.roomAt((p.x0 + p.x1) / 2 - 0.2, (p.z0 + p.z1) / 2 - 0.2);
       if (!this.explored.has(ri) && !this.explored.has(rj)) continue;
       ctx.fillRect(p.x0 * s, p.z0 * s, (p.x1 - p.x0) * s, (p.z1 - p.z0) * s);
@@ -181,9 +212,24 @@ export class Hud {
       ctx.fillText('?', ((r.x0 + r.x1) / 2) * s, ((r.z0 + r.z1) / 2) * s + 9);
       ctx.textAlign = 'left';
     }
-    // dock
+    // the spill, while it's a task
+    if (g.kibble.spillShown) {
+      ctx.fillStyle = '#ffb040';
+      for (const p of g.kibble.list) if (p.group === 'spill' && p.shown && !p.taken) ctx.fillRect(p.x * s - 1, p.z * s - 1, 2, 2);
+    }
+    // dock, and the way back to it
     ctx.fillStyle = '#30ff90';
     ctx.fillRect(DOCK.x * s - 6, DOCK.z * s - 4, 3, 8);
+    if (this.route && this.route.length) {
+      ctx.strokeStyle = `rgba(48,255,144,${0.55 + 0.35 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(g.roomba.x * s, g.roomba.z * s);
+      for (const [x, z] of this.route) ctx.lineTo(x * s, z * s);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     // the thing, briefly, after a scan
     const bl = g.lidar.blip;
     if (bl && g.time - bl.t < 4) {
@@ -211,18 +257,20 @@ export class Hud {
 
   // Object recognition: brackets around things the camera can make out.
   drawLabels() {
-    const g = this.game, ctx = this.lab, W = ctx.canvas.width, H = ctx.canvas.height;
+    const g = this.game, ctx = this.lab, W = this.W, H = this.H;
     ctx.clearRect(0, 0, W, H);
-    if (g.state !== 'playing' || !g.settings.labels) return;
+    if (g.state !== 'playing') return;
     const cam = g.camera, r = g.roomba;
     const cp = cam.getWorldPosition(this.v.clone());
+    ctx.font = `${Math.max(13, Math.round(H / 48))}px VT323, monospace`;
+    ctx.lineWidth = 1.5;
+    if (g.settings.mudMarkers) this.drawDirtMarks(ctx, cp, W, H);
+    if (!g.settings.labels) return;
     const v = this.v;
     const lampOn = r.light && !r.dead;
     g.entity.updateTag();
     const tags = [...g.house.tags, g.entity.tag];
     let shown = 0;
-    ctx.font = `${Math.max(13, Math.round(H / 48))}px VT323, monospace`;
-    ctx.lineWidth = 1.5;
     for (const tag of tags) {
       if (tag.gone || shown > 7) continue;
       const b = tag.box;
@@ -252,10 +300,13 @@ export class Hud {
       shown++;
       let label, color;
       if (isEnt) {
+        const e = g.entity;
         label = GLITCH_LABELS[Math.floor(g.time * 3) % GLITCH_LABELS.length];
-        if (g.entity.state === 'chase') label = '!!!!!!!!';
+        // while it can see you, the classifier settles on what it is
+        if (e.canSee || e.state === 'reach') label = `person ${Math.min(0.99, 0.42 + 0.57 * Math.min(1, e.suspicion)).toFixed(2)}`;
+        if (e.state === 'chase') label = 'person 0.99 · !!!!';
         color = `rgba(255,${40 + Math.random() * 40},40,0.95)`;
-        if (Math.random() < 0.15) { x0 += (Math.random() - 0.5) * 20; x1 += (Math.random() - 0.5) * 20; }
+        if (Math.random() < (e.canSee ? 0.04 : 0.15)) { x0 += (Math.random() - 0.5) * 20; x1 += (Math.random() - 0.5) * 20; }
       } else {
         const conf = Math.min(0.99, tag.conf + Math.sin(g.time * 2 + cx) * 0.02);
         label = `${tag.label} ${conf.toFixed(2)}`;
@@ -272,7 +323,6 @@ export class Hud {
       ctx.stroke();
       ctx.fillText(label, x0 + 2, y0 - 4);
     }
-    this.drawDirtMarks(ctx, cp, W, H);
   }
 
   // Dirt detect: mud on the floor is nearly invisible from 11 cm up, so the robot flags it.
@@ -297,5 +347,21 @@ export class Hud {
       if (n === 0) ctx.fillText(`mud ${p.amount.toFixed(2)}`, sx + s + 4, sy + 4);
       n++;
     }
+    // spilled dog food, while cleaning it is the task
+    if (g.story.task?.kind !== 'spill') return;
+    let m = 0;
+    for (const p of g.kibble.list) {
+      if (p.group !== 'spill' || !p.shown || p.taken || m > 14) continue;
+      const dx = p.x - cp.x, dz = p.z - cp.z, d = Math.hypot(dx, dz);
+      if (d > 6 || dx * fx + dz * fz < 0.15) continue;
+      v.set(p.x, 0.01, p.z).project(g.camera);
+      if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1) continue;
+      const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * H, s = Math.max(3, 9 - d);
+      ctx.strokeStyle = 'rgba(255,190,80,0.8)';
+      ctx.strokeRect(sx - s, sy - s, s * 2, s * 2);
+      if (m === 0) { ctx.fillStyle = 'rgba(255,190,80,0.9)'; ctx.fillText('kibble', sx + s + 4, sy + 4); }
+      m++;
+    }
   }
+
 }

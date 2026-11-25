@@ -65,8 +65,19 @@ export const T = {
   entLitNotice: 1.2,       // seconds of headlamp in its face before it turns on you
   entLoseTime: 2.8,        // seconds out of sight before a chase becomes a search
   entCatch: 0.55,
-  entSearchTime: 5,
+  entSearchMin: 6,         // seconds it stands over the place you hid (random between these)
+  entSearchMax: 14,
+  entFeintChance: 0.35,    // ...then, sometimes, it walks off and comes straight back
+  entReach: 1.3,           // how far its arm gets along the floor under furniture, from where it stands
+  entReachHear: 2.2,       // noise from under cover this close to it makes it reach
   entGrace: 20,            // after it first appears it is half-deaf and avoids your room
+
+  // The robot gives itself away
+  noiseVoice: 5,           // spoken prompts ("Battery low...")
+  noisePing: 6,            // a LIDAR scan
+  noiseCrunch: 3.5,        // sucking up dog food
+  dockCapture: 0.42,       // inside this, the robot is pulled onto the dock and turned the right way
+  dockRadius: 0.2,
 
   // Tasks
   roomTarget: 0.65,

@@ -1,7 +1,7 @@
 // The house as rules: walls, doors, collision, sight lines, the entity's walking grid and the dirt.
 // No three.js and no DOM, so tools/check.mjs can run it in Node.
 
-import { HOUSE, ROOMS, WALLS, DOORS, FTYPES, FURNITURE, FOOTPRINT_PATH, DOCK } from './level.js';
+import { HOUSE, ROOMS, WALLS, DOORS, FTYPES, FURNITURE, FOOTPRINT_PATH, DOCK, NOOKS } from './level.js';
 import { T } from './tune.js';
 
 export const CELL = 1 / 16;                       // dirt cell
@@ -39,6 +39,24 @@ export function segHitsRect(ax, az, bx, bz, r) {
   return true;
 }
 
+// Where along a->b (0..1) the segment is inside the rect, or null.
+export function segRectT(ax, az, bx, bz, r) {
+  let t0 = 0, t1 = 1;
+  const dx = bx - ax, dz = bz - az;
+  for (const [p, d, lo, hi] of [[ax, dx, r.x0, r.x1], [az, dz, r.z0, r.z1]]) {
+    if (Math.abs(d) < 1e-9) { if (p < lo || p > hi) return null; continue; }
+    let ta = (lo - p) / d, tb = (hi - p) / d;
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+    if (t0 > t1) return null;
+  }
+  return [t0, t1];
+}
+
+// How loud driving and bumping are on each floor. The hall runner is quiet; tile and bare boards are not.
+const FLOOR_NOISE = { wood: 1, woodDark: 1.15, checker: 1.3, smallTile: 1.3, concrete: 1.3, carpet: 0.6, carpetBlue: 0.6 };
+const FLOOR_NAME = { wood: 'WOOD', woodDark: 'BOARDS', checker: 'TILE', smallTile: 'TILE', concrete: 'CONCRETE', carpet: 'CARPET', carpetBlue: 'CARPET' };
+
 // Small deterministic noise for the dirt.
 function hash2(x, y, seed) {
   let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1442695041)) | 0;
@@ -60,6 +78,7 @@ const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t
 export class World {
   constructor() {
     this.pieces = [];     // wall boxes: {x0,x1,y0,y1,z0,z1,kind,along,at}
+    this.lintels = [];    // the tops of doorways and arches: too low for the thing to walk under upright
     this.windows = [];
     this.doors = {};
     this.solids = [];     // static rects that stop the robot
@@ -67,6 +86,9 @@ export class World {
     this.losBlocks = [];  // static rects that block sight
     this.covers = [];
     this.furniture = [];
+    this.lowBlocks = [];  // furniture short enough to see over from 2.4 m, tall enough to hide a robot behind it
+    this.rugs = [];
+    this.links = [];      // openings the thing can walk through: which two rooms, and the door if any
     this.rooms = ROOMS;
     this.buildWalls();
     this.buildFurniture();
@@ -81,7 +103,16 @@ export class World {
     for (const w of WALLS) {
       let from = w.from, to = w.to;
       if (w.along === 'x') { from -= t / 2; to += t / 2; }
+      // Full-height walls are cut where rooms meet, so each side of each piece faces one room (its wallpaper).
+      const cuts = [...new Set(ROOMS.flatMap((r) => (w.along === 'x' ? [r.x0, r.x1] : [r.z0, r.z1])))].sort((p, q) => p - q);
       const piece = (a, b, y0, y1, kind) => {
+        if (kind === 'solid') {
+          const inner = cuts.filter((c) => c > a + 0.02 && c < b - 0.02);
+          if (inner.length) { let s = a; for (const c of [...inner, b]) { piece1(s, c, y0, y1, kind); s = c; } return; }
+        }
+        piece1(a, b, y0, y1, kind);
+      };
+      const piece1 = (a, b, y0, y1, kind) => {
         if (b - a < 1e-4) return;
         const p = w.along === 'x'
           ? { x0: a, x1: b, z0: w.at - t / 2, z1: w.at + t / 2 }
@@ -90,7 +121,7 @@ export class World {
         this.pieces.push(p);
         if (y0 < T.bodyHeight) this.solids.push(p);
         if (y0 < 1) this.navBlocks.push(p);
-        if (kind === 'solid') this.losBlocks.push(p);
+        if (kind === 'solid' || kind === 'flap') this.losBlocks.push(p);
       };
       const ops = [...w.openings].sort((a, b) => a.from - b.from);
       let cur = from;
@@ -100,10 +131,17 @@ export class World {
           piece(o.from, o.to, 0, o.sill, 'sill');
           piece(o.from, o.to, o.top, H, 'lintel');
           this.windows.push({ along: w.along, at: w.at, from: o.from, to: o.to, sill: o.sill, top: o.top, moon: !!o.moon });
+        } else if (o.kind === 'flap') {
+          piece(o.from, o.to, o.top, H, 'flap');   // too low for it: blocks its walking grid and its sight
+          this.flap = { along: w.along, at: w.at, from: o.from, to: o.to, top: o.top };
         } else {
           const top = o.top ?? HOUSE.doorTop;
           piece(o.from, o.to, top, H, 'lintel');
+          this.lintels.push(this.pieces[this.pieces.length - 1]);
           if (o.kind === 'door') this.addDoor(o.door, w, o, top);
+          const c = (o.from + o.to) / 2, n = 0.3;
+          const [ax, az, bx, bz] = w.along === 'x' ? [c, w.at - n, c, w.at + n] : [w.at - n, c, w.at + n, c];
+          this.links.push({ a: this.roomAt(ax, az), b: this.roomAt(bx, bz), door: o.door || null, x: w.along === 'x' ? c : w.at, z: w.along === 'x' ? w.at : c });
         }
         cur = o.to;
       }
@@ -139,7 +177,11 @@ export class World {
       const info = FTYPES[f.type];
       const r = { x0: f.x0, z0: f.z0, x1: f.x1, z1: f.z1 };
       this.furniture.push({ def: f, info, rect: r });
+      if (f.type === 'rug') this.rugs.push(r);
       if (info.flat) continue;
+      let h = info.h;
+      if (f.type === 'boxes') { h = 0; for (let k = 0; k < (f.stack || 1); k++) h += 0.42 * (1 - k * 0.08); }
+      if (!info.los) this.lowBlocks.push({ ...r, h, clear: info.legs ? info.clear : 0 });
       this.navBlocks.push(r);
       if (info.los) this.losBlocks.push(r);
       if (info.solid) this.solids.push(r);
@@ -149,7 +191,7 @@ export class World {
           this.solids.push({ x0: lx, z0: lz, x1: lx + s, z1: lz + s, leg: true });
         if (info.clear < T.bodyHeight) this.solids.push(r);
       }
-      if (info.cover) this.covers.push({ ...r, type: f.type });
+      if (info.cover) this.covers.push({ ...r, type: f.type, i: this.covers.length });
     }
   }
 
@@ -218,6 +260,30 @@ export class World {
     return null;
   }
 
+  nookAt(x, z) {
+    for (const n of NOOKS) if (x > n.x0 && x < n.x1 && z > n.z0 && z < n.z1) return n;
+    return null;
+  }
+
+  // Sight from its eye (eyeH up) to something low (lowH up): does short furniture get in the way?
+  // A robot tucked right behind a stack of boxes is hidden from across the room, but not from close by.
+  losLow(ax, az, bx, bz, eyeH = 2.35, lowH = 0.06) {
+    for (const r of this.lowBlocks) {
+      const t = segRectT(ax, az, bx, bz, r);
+      if (!t) continue;
+      const hn = lowH + (eyeH - lowH) * (1 - t[1]), hf = lowH + (eyeH - lowH) * (1 - t[0]);
+      if (hn < r.h && hf > r.clear) return false;
+    }
+    return true;
+  }
+
+  floorAt(x, z) {
+    for (const r of this.rugs) if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return { name: 'RUG', noise: 0.5 };
+    const ri = this.roomAt(x, z);
+    const f = ri >= 0 ? ROOMS[ri].floor : 'wood';
+    return { name: FLOOR_NAME[f], noise: FLOOR_NOISE[f] };
+  }
+
   // ---------- entity walking grid ----------
 
   buildNav() {
@@ -257,6 +323,11 @@ export class World {
         if (d < bestD) { bestD = d; best = k; }
       }
     return best;
+  }
+
+  underLintel(x, z, m = 0.5) {
+    for (const p of this.lintels) if (x > p.x0 - m && x < p.x1 + m && z > p.z0 - m && z < p.z1 + m) return true;
+    return false;
   }
 
   // Could the entity get its centre within `d` of this spot? (Under a desk or behind a door it can't.)
@@ -356,6 +427,17 @@ export class World {
     return out;
   }
 
+  randomFreeNear(x, z, rMin, rMax, avoid = null, avoidR = 0) {
+    for (let t = 0; t < 40; t++) {
+      const a = Math.random() * Math.PI * 2, d = rMin + Math.random() * (rMax - rMin);
+      const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+      if (!this.navFree(px, pz) || this.roomAt(px, pz) === this.roomIndex('laundry')) continue;
+      if (avoid && Math.hypot(px - avoid[0], pz - avoid[1]) < avoidR) continue;
+      return [px, pz];
+    }
+    return null;
+  }
+
   randomFreeIn(roomIdx, rnd = Math.random) {
     const r = ROOMS[roomIdx];
     for (let t = 0; t < 40; t++) {
@@ -439,7 +521,34 @@ export class World {
     this.roomDirt.set(this.roomTotal);
     this.dirtBox = null;
     this.cleanDisc = disc;
+    this.cleanable = cleanable;
   }
+
+  // Its muddy feet: dirt laid back down on floor the brush can reach. An ellipse along the walking direction.
+  stampMud(x, z, dx, dz, amount = 0.45) {
+    const a = 0.13, b = 0.055, R = a + 0.02;
+    const i0 = Math.max(0, Math.floor((x - R) / CELL)), i1 = Math.min(GW - 1, Math.floor((x + R) / CELL));
+    const j0 = Math.max(0, Math.floor((z - R) / CELL)), j1 = Math.min(GH - 1, Math.floor((z + R) / CELL));
+    let added = 0;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const c = j * GW + i;
+      if (!this.cleanable[c] || this.room[c] < 0 || !ROOMS[this.room[c]].dirt) continue;
+      const px = (i + 0.5) * CELL - x, pz = (j + 0.5) * CELL - z;
+      const u = px * dx + pz * dz, v = -px * dz + pz * dx;
+      if ((u * u) / (a * a) + (v * v) / (b * b) > 1) continue;
+      const nv = Math.min(1, this.dirt[c] + amount);
+      added += nv - this.dirt[c];
+      this.roomDirt[this.room[c]] += nv - this.dirt[c];
+      this.dirt[c] = nv;
+    }
+    if (added > 0) {
+      const bx = this.dirtBox;
+      if (!bx) this.dirtBox = { i0, i1, j0, j1 };
+      else { bx.i0 = Math.min(bx.i0, i0); bx.i1 = Math.max(bx.i1, i1); bx.j0 = Math.min(bx.j0, j0); bx.j1 = Math.max(bx.j1, j1); }
+    }
+    return added;
+  }
+
 
   // Sweep a disc. Returns how much dirt came up.
   clean(x, z, rad, amount) {

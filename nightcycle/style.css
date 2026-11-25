@@ -1,4 +1,5 @@
 :root {
+  --ts: 1;
   --cyan: #6fe6ff;
   --cyan-dim: rgba(111, 230, 255, 0.55);
   --amber: #ffcf5a;
@@ -43,6 +44,7 @@ canvas#labels { position: fixed; inset: 0; pointer-events: none; }
 .keys b { font-weight: normal; }
 kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 4px; border: 1px solid currentColor; border-radius: 3px; opacity: 0.85; }
 #status-line { margin-top: 6px; color: var(--amber); letter-spacing: 0.06em; }
+#sensor-line { margin-top: 2px; font-size: 0.8em; opacity: 0.65; letter-spacing: 0.04em; }
 #hidden-tag { margin-top: 2px; color: #7dff9a; opacity: 0; transition: opacity 0.3s; }
 #hidden-tag.on { opacity: 1; animation: blink 1.4s steps(2) infinite; }
 
@@ -68,23 +70,25 @@ kbd { font-family: var(--mono); font-size: 0.85em; padding: 0 4px; border: 1px s
 .note { transition: opacity 0.7s, transform 0.7s; animation: in 0.35s ease-out; }
 .note.out { opacity: 0; transform: translateX(-20px); }
 @keyframes in { from { opacity: 0; transform: translateX(-20px); } }
-.note.app { font-family: var(--sans); background: rgba(240, 244, 248, 0.94); color: #1a1d22; border-radius: 14px; padding: 9px 12px; font-size: 13px; text-shadow: none; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); }
+.note.app { font-family: var(--sans); background: rgba(240, 244, 248, 0.94); color: #1a1d22; border-radius: 14px; padding: 9px 12px; font-size: calc(13px * var(--ts)); text-shadow: none; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5); }
 .note-app { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #5a6270; font-weight: 600; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
 .note-app .dot { width: 14px; height: 14px; border-radius: 4px; background: linear-gradient(135deg, #5ad1ff, #7b6cff); }
 .note-app .now { margin-left: auto; font-weight: 400; text-transform: none; }
-.note.sys { color: var(--amber); font-size: 0.95em; }
+.note.sys { color: var(--amber); font-size: calc(0.95em * var(--ts)); }
+.note.cap { color: #9fdcff; opacity: 0.85; }
+.note.cap::before { content: '♪ '; }
 .note.sys::before { content: '> '; opacity: 0.6; }
 
 #card { position: absolute; right: 18px; top: 50%; transform: translate(30px, -50%); width: min(330px, 40vw); padding: 12px 14px; background: rgba(10, 8, 4, 0.82); border: 1px solid rgba(255, 207, 90, 0.5); color: #f3e6c4; opacity: 0; transition: opacity 0.4s, transform 0.4s; text-shadow: none; }
 #card.on { opacity: 1; transform: translate(0, -50%); }
 .card-kind { color: var(--amber); font-size: 0.85em; letter-spacing: 0.2em; }
 .card-name { font-size: 1.4em; color: #fff; margin: 2px 0 6px; }
-.card-text { font-family: var(--sans); font-size: 14px; line-height: 1.45; }
+.card-text { font-family: var(--sans); font-size: calc(14px * var(--ts)); line-height: 1.45; }
 
-#hint { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); padding: 6px 14px; background: rgba(0, 0, 0, 0.6); border: 1px solid var(--cyan-dim); opacity: 0; transition: opacity 0.5s; text-align: center; max-width: 80vw; }
+#hint { font-size: calc(1em * var(--ts)); position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); padding: 6px 14px; background: rgba(0, 0, 0, 0.6); border: 1px solid var(--cyan-dim); opacity: 0; transition: opacity 0.5s; text-align: center; max-width: 80vw; }
 #hint.on { opacity: 1; }
 #hint b { color: #fff; font-weight: normal; }
-#subtitle { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); color: #fff; opacity: 0; transition: opacity 0.4s; font-size: 1.15em; text-align: center; max-width: 80vw; }
+#subtitle { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); color: #fff; opacity: 0; transition: opacity 0.4s; font-size: calc(1.15em * var(--ts)); text-align: center; max-width: 80vw; }
 #subtitle.on { opacity: 0.9; }
 
 .frame-corner { position: absolute; width: 26px; height: 26px; border: 2px solid var(--cyan-dim); opacity: 0.5; }
@@ -116,7 +120,17 @@ button.ghost { border-color: rgba(111, 230, 255, 0.25); }
 .small { font-size: 0.95em; }
 .death-panel { border-color: rgba(255, 68, 48, 0.6); }
 .death-panel h2 { color: var(--red); text-shadow: 0 0 12px var(--red); animation: flick 1.5s infinite; }
-#death-reason { font-size: 1.3em; opacity: 0.85; margin-bottom: 22px; }
+#death-reason { font-size: 1.3em; opacity: 0.85; margin-bottom: 12px; }
+#death-log { text-align: left; margin: 0 auto 10px; padding: 8px 12px; border-left: 2px solid rgba(255, 68, 48, 0.6); background: rgba(255, 68, 48, 0.06); font-size: calc(1.1em * var(--ts)); }
+#death-log div { color: var(--amber); }
+#death-log div span { opacity: 0.6; margin-right: 8px; }
+#death-log:empty { display: none; }
+#death-tip { font-family: var(--sans); font-size: calc(14px * var(--ts)); line-height: 1.45; opacity: 0.9; margin: 0 0 18px; }
+#death-tip:empty { display: none; }
+.diff { display: flex; gap: 6px; justify-content: center; margin: 4px 0 2px; }
+.diff button { flex: 1; margin: 0; font-size: 1.15em; padding: 5px 8px; }
+.diff button.on { background: rgba(111, 230, 255, 0.22); color: #fff; border-color: var(--cyan); }
+.diff-desc { min-height: 1.3em; margin: 4px 0 8px; }
 #end-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin: 18px 0; text-align: left; font-size: 1.2em; }
 #end-stats div { display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(111, 230, 255, 0.2); }
 #end-stats b { font-weight: normal; color: #fff; }
@@ -155,4 +169,8 @@ body.touch .keys-only { display: none; }
   .controls { grid-template-columns: repeat(2, 1fr); }
 }
 
-body.debug::after { content: 'DEBUG  1-6 step · G ghost · B battery · C clean · T teleport · K die'; position: fixed; left: 8px; bottom: 6px; color: #ff0; font-size: 14px; opacity: 0.6; pointer-events: none; }
+/* Flashing effects off: no blinking or strobing anywhere */
+body.calm #motion.alert, body.calm .meter.low .bar > div, body.calm #hidden-tag.on, body.calm .logo, body.calm .logo::before,
+body.calm .logo::after, body.calm .death-panel h2, body.calm #hud.bumped { animation: none !important; }
+
+body.debug::after { content: 'DEBUG  1-7 step · G ghost · B battery · C clean · T teleport · K die'; position: fixed; left: 8px; bottom: 6px; color: #ff0; font-size: 14px; opacity: 0.6; pointer-events: none; }
