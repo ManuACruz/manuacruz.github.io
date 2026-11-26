@@ -5,7 +5,7 @@ import { soundOn, setSound, sfx, unlock } from './audio.js';
 const $ = (id) => document.getElementById(id);
 
 export function initUI(api) {
-  // api: { levels: [{name, title}], progress(), onPlay(), onRestart(), onNext(), onLevel(i), onSkip(), onResetProgress(), paused(v) }
+  // api: { levels: [{name, title}], progress(), onPlay(), onRestart(), onNext(), onLevel(i), onSkip(), onAlbum(), onResetProgress(), paused(v) }
   const title = $('title'), settings = $('settings'), next = $('btn-next'), buttons = $('hud-buttons');
 
   $('btn-play').addEventListener('click', () => {
@@ -14,6 +14,13 @@ export function initUI(api) {
     title.classList.add('leaving');
     setTimeout(() => (title.hidden = true), 380);
     api.onPlay();
+  });
+  $('btn-album').addEventListener('click', () => {
+    unlock();
+    sfx.click();
+    title.classList.add('leaving');
+    setTimeout(() => (title.hidden = true), 380);
+    api.onAlbum();
   });
   $('btn-restart').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -56,7 +63,7 @@ export function initUI(api) {
     head.append(x);
     card.append(head);
 
-    card.append(el('h3', '', 'Pages'));
+    card.append(el('h3', '', 'Levels'));
     const lv = el('div', 'levels');
     api.levels.forEach((L, i) => {
       const b = el('button', 'lv' + (i < prog ? ' done' : ''), `${i + 1}<small>${L.title}</small>`);
@@ -72,14 +79,16 @@ export function initUI(api) {
       snd.innerHTML = soundOn() ? '🔊 Sound on' : '🔈 Sound off';
       sfx.click();
     };
-    const skip = el('button', '', '⏭ Skip to the album');
+    const book = el('button', '', '📒 Sticker album');
+    book.onclick = () => (sfx.click(), closeSettings(), api.onAlbum());
+    const skip = el('button', '', '⏭ Skip to the end');
     skip.onclick = () => (closeSettings(), api.onSkip());
     const rp = el('button', '', '↺ Reset progress');
     rp.onclick = () => {
       api.onResetProgress();
       build();
     };
-    row.append(snd, skip, rp);
+    row.append(snd, book, skip, rp);
     card.append(row);
 
     card.append(el('h3', '', 'Tuning'));
@@ -136,6 +145,11 @@ export function initUI(api) {
     showTitle() {
       title.hidden = false;
       title.classList.remove('leaving');
+    },
+    setAlbumBadge(n) {
+      const b = document.querySelector('#btn-album .badge');
+      b.hidden = !n;
+      b.textContent = n;
     },
     settingsOpen: () => !settings.hidden,
     toggleSettings: () => (settings.hidden ? openSettings() : closeSettings()),

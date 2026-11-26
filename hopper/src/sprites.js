@@ -1,4 +1,5 @@
-// Emoji sprites, pre-rendered once: plain, sticker (white die-cut border) and ghost (flat silhouette).
+// Emoji sprites, pre-rendered once: plain, sticker (white die-cut border), ghost (flat silhouette),
+// outline (the die-cut shape as a line, for "stick it here") and gloss (the shiny mark a sticker leaves on its backing).
 
 export const EMOJI_FONT = '"Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif';
 export const UI_FONT = 'Fredoka, "Baloo 2", ui-rounded, "Segoe UI Rounded", "Arial Rounded MT Bold", system-ui, sans-serif';
@@ -57,7 +58,33 @@ function sticker(src) {
   return c;
 }
 
-// style: 'plain' | 'sticker' | 'ghost'
+// the silhouette grown by d px
+function dilate(src, color, d) {
+  const c = canvas();
+  const x = c.getContext('2d');
+  const ink = silhouette(src, color);
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    x.drawImage(ink, Math.cos(a) * d, Math.sin(a) * d);
+  }
+  return c;
+}
+
+// the die-cut edge as a line, with a faint fill inside
+function outline(src, color) {
+  const c = canvas();
+  const x = c.getContext('2d');
+  x.drawImage(dilate(src, color, 10), 0, 0);
+  x.globalCompositeOperation = 'destination-out';
+  const inner = dilate(src, color, 6.5);
+  x.drawImage(inner, 0, 0);
+  x.globalCompositeOperation = 'source-over';
+  x.globalAlpha = 0.12;
+  x.drawImage(inner, 0, 0);
+  return c;
+}
+
+// style: 'plain' | 'sticker' | 'ghost' | 'outline' | 'gloss'
 export function emoji(e, style = 'plain') {
   const key = style + e;
   let c = cache.get(key);
@@ -66,6 +93,8 @@ export function emoji(e, style = 'plain') {
   cache.set('plain' + e, b);
   if (style === 'sticker') c = sticker(b);
   else if (style === 'ghost') c = silhouette(b, '#7d8597');
+  else if (style === 'outline') c = outline(b, '#5b4a3a');
+  else if (style === 'gloss') c = dilate(b, '#ffffff', 9);
   else c = b;
   cache.set(key, c);
   return c;

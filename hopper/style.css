@@ -66,6 +66,16 @@ button {
 }
 .big:active { box-shadow: 0 1px 0 #c99a2e, 0 3px 8px rgba(40, 50, 90, 0.3); }
 .big span { display: inline-block; animation: nudge 0.9s ease-in-out infinite; }
+.big.alt { background: #fff; box-shadow: 0 6px 0 #8f9bb3, 0 10px 24px rgba(40, 50, 90, 0.25); position: relative; }
+.big.alt:active { box-shadow: 0 1px 0 #8f9bb3, 0 3px 8px rgba(40, 50, 90, 0.25); }
+.title-buttons { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.badge {
+  position: absolute; top: -10px; right: -10px; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 15px;
+  background: #ff5d8f; color: #fff; font-size: 18px; line-height: 30px; box-shadow: 0 2px 0 #c23a66;
+  animation: badge 1.4s ease-in-out infinite;
+}
+.badge[hidden] { display: none; }
+@keyframes badge { 50% { transform: scale(1.15); } }
 
 @keyframes nudge { 50% { transform: translateX(5px); } }
 

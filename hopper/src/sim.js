@@ -18,7 +18,10 @@ export function scaleLevel(raw) {
   const L = {
     raw,
     name: raw.name,
-    page: raw.page,
+    id: raw.id,
+    world: raw.world,
+    title: raw.title,
+    stickers: raw.stickers,
     unit: u,
     w: raw.size[0] * u,
     h: raw.size[1] * u,
@@ -26,8 +29,8 @@ export function scaleLevel(raw) {
     blocks: raw.blocks.map(([x, y, w, h], i) => ({ i, x: x * u, y: y * u, w: w * u, h: h * u })),
     pins: raw.pins.map((p, i) => ({ i, id: p.id, t: p.t, x: p.x * u, y: p.y * u, len: p.len ? p.len * u : null, angle: p.angle ?? null })),
     items: raw.items.map((it, i) => ({ i, id: it.id, kind: it.kind, x: it.x * u, y: it.y * u })),
-    goals: raw.goals.map((g, i) => ({ i, x: g.at[0] * u, y: g.at[1] * u, items: g.items, board: g.board })),
-    cams: (raw.cams || []).map(([x, y]) => ({ x: x * u, y: y * u })),
+    goals: raw.goals.map((g, i) => ({ i, x: g.at[0] * u, y: g.at[1] * u, items: g.items })),
+    cams: (raw.cams || []).map(([x, y, z]) => ({ x: x * u, y: y * u, z: z || 1 })),
     solution: raw.solution || [],
   };
   // A pin C sits on its block: its tap centre is one radius above the block top.
@@ -413,7 +416,7 @@ export class Sim {
     }
   }
 
-  // After the board for a won goal: next goal, new checkpoint. Returns true when the level is finished.
+  // After a won goal: next goal, new checkpoint. Returns true when the level is finished.
   completeGoal() {
     const g = this.L.goals[this.goal];
     const ch = this.ch;
@@ -466,9 +469,17 @@ export function waitFar(sim, maxT = 30) {
   }
 }
 
-// Play a level's solution on a fresh sim. `onStep(sim, step, situation, afterWait)` runs before each tap or swipe.
-export function playSolution(level, T, onStep) {
+// Play a level's solution on a fresh sim. `onStep(sim, step, situation, afterWait)` runs before each tap or swipe;
+// `onTick(sim)`, if given, after every sim step.
+export function playSolution(level, T, onStep, onTick) {
   const sim = new Sim(level, T);
+  if (onTick) {
+    const step = sim.step.bind(sim);
+    sim.step = (dt) => {
+      step(dt);
+      onTick(sim);
+    };
+  }
   const rec = [];
   let afterWait = false;
   let error = null;

@@ -1,9 +1,11 @@
 // Level checker: node tools/check.mjs [--runs 20000] [--level 3] [--seed 1]
-// 1. plays each level's solution, 2. checks the camera spots, 3. runs random players.
-import { Sim, scaleLevel, playSolution, settle, STEP, R, PIN_R } from '../src/sim.js';
+// 1. plays each level's solution, 2. checks the camera framing before every step (tools/framing.mjs), 3. runs random players.
+import { Sim, scaleLevel, playSolution, STEP } from '../src/sim.js';
 import { CamSpots } from '../src/cam.js';
 import { LEVELS } from '../src/levels.js';
 import { DEFAULTS } from '../src/tune.js';
+import { frameLevel } from './framing.mjs';
+import { stickerProblems } from '../src/stickers.js';
 
 const args = process.argv.slice(2);
 const arg = (k, d) => {
@@ -21,35 +23,17 @@ function inside(r, x, y, pad) {
   return x - pad >= r.x0 && x + pad <= r.x1 && y - pad >= r.y0 && y + pad <= r.y1;
 }
 
-function margin(r, x, y) {
-  return Math.min(x - r.x0, r.x1 - x, y - r.y0, r.y1 - y);
-}
-
 function checkSolution(L) {
-  const cam = new CamSpots(L, T);
-  const big = cam.rects.length > 0 && (L.w > T.viewW || L.h > T.viewH);
-  const problems = [];
-  const res = playSolution(L, T, (sim, st, sit, afterWait) => {
-    if (!big) return;
-    const i = cam.update(sim);
-    const r = cam.rects[i];
-    const ch = sim.ch;
-    if (!inside(r, ch.x, ch.y, R)) problems.push(`before ${st}: character not wholly in spot ${i}`);
-    if (typeof st === 'string') {
-      const p = sim.pin(st);
-      const m = margin(r, p.cx, p.cy);
-      if (m < 16) problems.push(`before ${st}: pin only ${m.toFixed(0)} px inside spot ${i}`);
-    }
-  });
+  const res = playSolution(L, T);
   const got = res.sim.got.size;
   console.log(`  solution: ${res.ok ? 'OK' : 'FAIL'}  goals ${res.sim.goal}/${L.goals.length}, items ${got}/${L.items.length}${res.error ? '  (' + res.error + ')' : ''}`);
   if (!res.ok) failures++;
-  if (big) {
-    if (problems.length) {
-      failures++;
-      for (const p of problems) console.log('  camera: ' + p);
-    } else console.log('  camera: OK');
-  }
+  // framing rules before every step (details: node tools/framing.mjs)
+  const f = frameLevel(L, T);
+  const bad = f.steps.filter((s) => s.problems.length);
+  if (bad.length) failures++;
+  for (const s of bad) console.log(`  camera: before ${s.st}${f.big ? ` (spot ${s.spot})` : ''}: ${s.problems.map((p) => `${p.what} short by ${p.short.toFixed(0)} px`).join(', ')}`);
+  if (!bad.length) console.log(`  camera: OK${f.big ? ` (${f.moves} moves)` : ''}`);
   return res;
 }
 
@@ -114,6 +98,12 @@ LEVELS.forEach((raw, i) => {
   checkSolution(L);
   if (RUNS > 0) randomPlayers(L);
 });
+
+// every sticker has a spot on its world's album spread
+const sp = stickerProblems();
+for (const p of sp) console.log('album: ' + p);
+if (sp.length) failures++;
+else console.log('\nalbum: every sticker has a spot');
 
 if (failures) {
   console.log(`\n${failures} problem(s)`);

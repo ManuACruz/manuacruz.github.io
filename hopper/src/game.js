@@ -9,6 +9,7 @@ import { Blob } from './blob.js';
 import { Album, roundRect, drawHand } from './album.js';
 import { drawEmoji, emoji, UI_FONT } from './sprites.js';
 import { initUI } from './ui.js';
+import { album, levelStickers } from './stickers.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -123,7 +124,7 @@ function loadLevel(i) {
 
 function stick(id) {
   const it = G.L.items.find((i) => i.id === id);
-  return G.L.page.stickers[it.kind];
+  return G.L.stickers[it.kind];
 }
 
 // ---------- camera ----------
@@ -135,14 +136,14 @@ function playCamTarget() {
   if (G.fits) return levelCenter();
   const i = G.spots.update(G.sim);
   const r = G.spots.rects[i];
-  return { x: r.cx, y: r.cy, z: 1 };
+  return { x: r.cx, y: r.cy, z: r.z };
 }
 
 function goalSpot() {
   const g = G.L.goals[G.L.goals.length - 1];
   if (G.fits) return { x: g.x, y: g.y - 90, z: 1.35 };
   const r = G.spots.rects[G.spots.spotFor(g.x, g.y)];
-  return { x: r.cx, y: r.cy, z: 1 };
+  return { x: r.cx, y: r.cy, z: r.z };
 }
 
 function placeCameraOnGoal() {
@@ -167,6 +168,7 @@ function updateCamera(dt) {
 // ---------- opening ----------
 function startIntro() {
   G.mode = 'intro';
+  G.btnShown = true;
   ui.showButtons(true);
   showBanner();
   const g = goalSpot();
@@ -176,16 +178,16 @@ function startIntro() {
     G.intro = { t: 0, total: T.introT, path: null };
     tween(G.cam, c, T.introT * 0.38, { delay: T.introT * 0.62, ease: ease.cubicInOut, done: endIntro });
   } else {
-    const pts = [{ x: g.x, y: g.y }];
+    const pts = [{ x: g.x, y: g.y, z: g.z }];
     const rev = G.route.slice().reverse();
     for (const i of rev) {
       const r = G.spots.rects[i];
       const last = pts[pts.length - 1];
-      if (Math.hypot(r.cx - last.x, r.cy - last.y) > 1) pts.push({ x: r.cx, y: r.cy });
+      if (Math.hypot(r.cx - last.x, r.cy - last.y) > 1) pts.push({ x: r.cx, y: r.cy, z: r.z });
     }
     const end = playCamTarget();
     const last = pts[pts.length - 1];
-    if (Math.hypot(end.x - last.x, end.y - last.y) > 1) pts.push({ x: end.x, y: end.y });
+    if (Math.hypot(end.x - last.x, end.y - last.y) > 1) pts.push({ x: end.x, y: end.y, z: end.z });
     let len = 0;
     for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
     const dur = clamp(len / T.panSpeed, 0.6, 3);
@@ -209,6 +211,7 @@ function updateIntro(dt) {
       const f = seg ? clamp((d - acc) / seg, 0, 1) : 1;
       G.cam.x = lerp(P[i - 1].x, P[i].x, f);
       G.cam.y = lerp(P[i - 1].y, P[i].y, f);
+      G.cam.z = lerp(P[i - 1].z, P[i].z, f);
       break;
     }
     acc += seg;
@@ -222,13 +225,12 @@ function endIntro() {
   killTweens(G.cam);
   G.mode = 'play';
   G.intro = null;
-  G.cam.z = 1;
   snapCamera();
   G.help.idle = 0;
 }
 
 function showBanner() {
-  const b = (G.banner = { y: -120, a: 1, s: 0.6, sub: `Page ${G.li + 1}`, title: G.L.page.title });
+  const b = (G.banner = { y: -120, a: 1, s: 0.6, sub: `Level ${G.li + 1}`, title: G.L.title });
   tween(b, { y: 0, s: 1 }, 0.5, { ease: ease.backOut });
   tween(b, { y: -140, a: 0 }, 0.35, { delay: 1.9, ease: ease.backIn, done: () => G.banner === b && (G.banner = null) });
 }
@@ -243,14 +245,14 @@ canvas.addEventListener('pointerdown', (e) => {
   unlock();
   const p = toStage(e);
   if (G.mode === 'intro') return endIntro();
-  if (G.mode === 'board' && G.album) return G.album.down(p.x, p.y);
+  if (G.album) return G.album.down(p.x, p.y);
   if (G.mode !== 'play' || G.paused) return;
   tapAt(p.x, p.y);
 });
 canvas.addEventListener('pointermove', (e) => {
   if (e.pointerId !== G.pointer) return;
   const p = toStage(e);
-  if (G.mode === 'board' && G.album) return G.album.move(p.x, p.y);
+  if (G.album) return G.album.move(p.x, p.y);
   const sw = G.swipe;
   if (!sw) return;
   G.trail.push({ x: p.x, y: p.y, t: G.time });
@@ -266,7 +268,7 @@ function release(e) {
   if (e.pointerId !== G.pointer) return;
   G.pointer = null;
   const p = toStage(e);
-  if (G.mode === 'board' && G.album) G.album.up(p.x, p.y);
+  if (G.album) G.album.up(p.x, p.y);
   G.swipe = null;
 }
 canvas.addEventListener('pointerup', release);
@@ -301,11 +303,14 @@ function tapAt(x, y) {
 const keys = {};
 window.addEventListener('keydown', (e) => {
   keys[e.key] = true;
+  if (G.album && !ui.settingsOpen()) {
+    if (!e.repeat) G.album.key(e.key);
+    if (e.key !== 'Escape' || G.album.mode === 'browse') return;
+  }
   if (e.key === 'Escape') return ui.toggleSettings();
   if (e.repeat) return;
   unlock();
   if (G.mode === 'intro' && (e.key === ' ' || e.key === 'Enter')) return endIntro();
-  if (G.mode === 'board' && G.album && G.album.phase === 'solved' && (e.key === ' ' || e.key === 'Enter')) return G.album.down(0, 0);
   if (G.mode !== 'play' || G.paused) return;
   if (e.key === 'ArrowUp' || e.key === ' ') {
     const lean = keys.ArrowLeft ? -35 : keys.ArrowRight ? 35 : 0;
@@ -492,6 +497,7 @@ function collect(it) {
 
 // ---------- winning, losing, restarting ----------
 function onWon(goal) {
+  if (goal.i < G.L.goals.length - 1) return onMail(goal);
   G.mode = 'win';
   const B = G.blob, sim = G.sim;
   sfx.goal();
@@ -504,11 +510,10 @@ function onWon(goal) {
   const z = 1.2, ws = G.W / G.s, hs = G.H / G.s;
   Object.assign(G.camT, { x: goal.x + (0.375 * ws) / z, y: goal.y - (0.16 * hs) / z, z });
   G.camRate = 3.2;
-  // slide to 74 px left of the goal
-  const ch = sim.ch;
-  const tx = goal.x - 74;
-  ch.face = tx < ch.x ? -1 : 1;
-  tween(ch, { x: tx }, 0.5, { ease: ease.cubicInOut, done: () => (ch.face = 1) });
+  slideBeside(goal);
+  // the level's stickers are won: into the pocket until they're stuck in the album
+  const keys = levelStickers(G.li);
+  album.addToPocket(keys);
   // items fly from the HUD into the slots above the goal
   const slots = goalSlots(goal);
   slots.forEach((sl, i) => {
@@ -527,43 +532,113 @@ function onWon(goal) {
       });
     });
   });
-  after(1.5, () => openAlbum(goal));
+  const todo = keys.filter((k) => !album.placed(k));
+  after(todo.length ? 1.5 : 1.3, () => (todo.length ? openBook(todo) : finishLevel()));
 }
 
-function openAlbum(goal) {
-  if (G.mode !== 'win') return;
-  G.mode = 'board';
-  const slots = goalSlots(goal);
-  const L = G.L;
-  G.album = new Album({
-    title: L.page.title,
-    subtitle: `Page ${G.li + 1}${L.goals.length > 1 ? ` · part ${goal.i + 1} of ${L.goals.length}` : ''}`,
-    caption: goal.board.caption,
-    parts: goal.board.parts,
-    stickers: L.page.stickers,
-    items: slots.map((sl) => ({ id: sl.id, kind: L.items.find((it) => it.id === sl.id).kind })),
-    homeOf: (i) => w2s(slots[i].x, slots[i].y),
-    factMin: T.factMin,
-    onPlace: (it) => (G.slotFill[it.id] = null),
-    onDone: closeAlbum,
+// slide to 74 px left of the goal
+function slideBeside(goal) {
+  const ch = G.sim.ch;
+  const tx = goal.x - 74;
+  ch.face = tx < ch.x ? -1 : 1;
+  tween(ch, { x: tx }, 0.5, { ease: ease.cubicInOut, done: () => (ch.face = 1) });
+}
+
+// A goal before the last is a mailbox: the stickers are posted, the flag goes up, the checkpoint is saved, play on.
+function onMail(goal) {
+  G.mode = 'win';
+  const sim = G.sim;
+  sfx.goal();
+  G.blob.setMood('happy', 1.5);
+  const gf = G.goalFx[goal.i];
+  gf.s = 1.25;
+  tween(gf, { s: 1 }, 0.6, { ease: ease.elasticOut });
+  slideBeside(goal);
+  const ids = goal.items;
+  ids.forEach((id, i) => {
+    after(0.25 + i * 0.16, () => {
+      const hi = G.hud.findIndex((h) => h.id === id);
+      const from = hudPos(hi);
+      G.spent.add(id);
+      G.flyers.push({
+        e: stick(id), x: from.x, y: from.y, fx: from.x, fy: from.y, to: () => w2s(goal.x, goal.y + MAIL.top + MAIL.w * 0.4), k: 0, dur: 0.55, s0: 1, s1: 0.35, rot: 0, arc: -110,
+        done: () => {
+          sfx.pick();
+          gf.s = 1.15;
+          tween(gf, { s: 1 }, 0.35, { ease: ease.elasticOut });
+        },
+      });
+    });
+  });
+  after(0.25 + ids.length * 0.16 + 0.6, () => {
+    gf.done = true;
+    tween(gf, { flag: 1 }, 0.6, { ease: ease.elasticOut });
+    sfx.mail();
+    burst(goal.x, goal.y - GOAL_H, 12, { kind: 'star', color: ['#ffd23f', '#fff', '#ff5d8f'], speed: 320, size: 7, g: 300 });
+    after(0.55, () => {
+      if (G.mode !== 'win') return;
+      sim.completeGoal();
+      sim.events.length = 0;
+      G.mode = 'play';
+      G.camRate = T.camSmooth;
+      Object.assign(G.camT, playCamTarget());
+      G.blob.setMood('happy', 0.8);
+      G.help.idle = 0;
+    });
   });
 }
 
-function closeAlbum() {
+function openBook(keys) {
+  if (G.mode !== 'win') return;
+  G.mode = 'board';
+  G.album = new Album({
+    mode: 'level',
+    keys,
+    onHat: setHat,
+    onClose: () => {
+      G.album = null;
+      finishLevel();
+    },
+  });
+}
+
+// The album screen (from the title or the settings).
+function openBrowse() {
+  if (G.album || !['title', 'play', 'party'].includes(G.mode)) return;
+  const from = G.mode;
+  G.mode = 'book';
+  ui.showNext(false);
+  G.album = new Album({
+    mode: 'browse',
+    keys: album.pocket(),
+    onHat: setHat,
+    onClose: () => {
+      G.album = null;
+      G.mode = from;
+      if (from === 'title') ui.showTitle();
+      if (from === 'party' && G.nextLabel) ui.showNext(true, G.nextLabel);
+      updateBadge();
+    },
+  });
+}
+
+function setHat(h) {
+  G.blob.hat = h;
+}
+
+function updateBadge() {
+  ui.setAlbumBadge(album.pocket().length);
+}
+
+function finishLevel() {
   const sim = G.sim, g = G.L.goals[sim.goal];
   G.goalFx[g.i].done = true;
   tween(G.goalFx[g.i], { flag: 1 }, 0.6, { ease: ease.elasticOut, delay: 0.2 });
-  G.album = null;
   G.blob.setMood('happy', 1);
-  const last = sim.completeGoal();
+  sim.completeGoal();
   sim.events.length = 0;
   G.camRate = T.camSmooth;
-  if (!last) {
-    G.mode = 'play';
-    Object.assign(G.camT, playCamTarget());
-    G.help.idle = 0;
-    return;
-  }
+  updateBadge();
   // party
   G.mode = 'party';
   G.progress = Math.max(G.progress, G.li + 1);
@@ -572,7 +647,7 @@ function closeAlbum() {
   } catch {}
   Object.assign(G.camT, G.fits ? levelCenter() : (() => {
     const r = G.spots.rects[G.spots.spotFor(g.x, g.y)];
-    return { x: r.cx, y: r.cy, z: 1 };
+    return { x: r.cx, y: r.cy, z: r.z };
   })());
   const party = (G.party = { t: 0 });
   const hop = () => {
@@ -592,9 +667,10 @@ function closeAlbum() {
   sfx.solved();
   bigConfetti();
   after(1.2, () => G.party === party && bigConfetti());
-  G.banner = { y: -120, a: 1, s: 0.6, sub: `Page ${G.li + 1} complete!`, title: '★ Sticker page filled ★', stay: true };
+  G.banner = { y: -120, a: 1, s: 0.6, sub: `Level ${G.li + 1} complete!`, title: `★ ${G.L.title} ★`, stay: true };
   tween(G.banner, { y: 0, s: 1 }, 0.6, { ease: ease.backOut });
-  after(T.nextT, () => G.party === party && ui.showNext(true, G.li === LEVELS.length - 1 ? 'Play again' : 'Next page'));
+  G.nextLabel = G.li === LEVELS.length - 1 ? 'Play again' : 'Next level';
+  after(T.nextT, () => G.party === party && G.mode === 'party' && ui.showNext(true, G.nextLabel));
 }
 
 function bigConfetti() {
@@ -644,13 +720,21 @@ function startWipe() {
   });
 }
 
+// Skip to the end of the level: earlier mailboxes are posted, every sticker is held, Hopper stands on the last goal.
 function skipToBoard() {
   if (G.mode === 'title' || G.mode === 'intro') endIntro();
   if (G.mode !== 'play') return;
-  const sim = G.sim, g = G.L.goals[sim.goal];
-  for (const id of g.items) {
-    sim.got.add(id);
-    const h = G.hud.find((q) => q.id === id);
+  const sim = G.sim, L = G.L, g = L.goals[L.goals.length - 1];
+  for (const gl of L.goals) {
+    if (gl === g) break;
+    G.goalFx[gl.i].done = true;
+    G.goalFx[gl.i].flag = 1;
+    for (const id of gl.items) G.spent.add(id);
+  }
+  sim.goal = g.i;
+  for (const it of L.items) {
+    sim.got.add(it.id);
+    const h = G.hud.find((q) => q.id === it.id);
     if (h) h.got = true;
   }
   Object.assign(sim.ch, { x: g.x, y: g.y - R, state: 'stand', dest: null, pin: null, fl: null, sw: null, vx: 0, vy: 0 });
@@ -737,7 +821,7 @@ function update(dt) {
     }
     swingWhoosh();
     speedLines();
-  } else if (G.mode === 'win' || G.mode === 'board' || G.mode === 'party') {
+  } else if (G.mode === 'win' || G.mode === 'board' || G.mode === 'party' || G.mode === 'book') {
     sim.events.length = 0;
   }
   for (const f of G.goalFx) f.shake = Math.max(0, f.shake - dt);
@@ -828,12 +912,9 @@ function render() {
   drawFlyers();
   drawTrail();
   drawHelp();
-  drawParticles(ctx, true, (e) => emoji(e, 'sticker'));
-  if (G.album) {
-    G.album.draw(ctx);
-    G.album.drawItems(ctx);
-  }
   drawBanner();
+  if (G.album) G.album.draw(ctx);
+  drawParticles(ctx, true, (e) => emoji(e, 'sticker'));
   drawWipe();
 }
 
@@ -933,6 +1014,37 @@ function drawGoal(g) {
   const breathe = current ? 1 + Math.sin(t * 3) * 0.02 : 1;
   ctx.scale(f.s * (2 - breathe), f.s * breathe);
   ctx.globalAlpha = current || f.done ? 1 : 0.55;
+  if (g.i < G.L.goals.length - 1) drawMailbox(f, t);
+  else drawGoalBox(f, t);
+  ctx.restore();
+  // slots above the goal
+  if (f.done || (G.album && G.album.owns())) return;
+  const slots = goalSlots(g);
+  slots.forEach((sl, i) => {
+    const fill = G.slotFill[sl.id];
+    const miss = f.shake > 0 && f.missing && f.missing.has(sl.id);
+    const bob = Math.sin(t * 2.5 + i) * 4;
+    const x = sl.x + (miss ? sx : 0), y = sl.y + bob;
+    ctx.save();
+    ctx.globalAlpha = current ? 1 : 0.5;
+    ctx.fillStyle = miss ? 'rgba(229, 72, 77, 0.35)' : 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.arc(x, y, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.setLineDash([7, 6]);
+    ctx.lineDashOffset = -t * 15;
+    ctx.strokeStyle = miss ? '#e5484d' : 'rgba(90, 100, 130, 0.6)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    if (fill) drawEmoji(ctx, stick(sl.id), x, y, 25 * fill.s, 'sticker');
+    else drawEmoji(ctx, stick(sl.id), x, y, 22, 'ghost', 0, current ? 0.45 : 0.25);
+  });
+}
+
+// the last goal: a box with the album on it, and a flag
+function drawGoalBox(f, t) {
   // flag pole
   ctx.strokeStyle = '#7a5c2e';
   ctx.lineWidth = 5;
@@ -959,33 +1071,55 @@ function drawGoal(g) {
   roundRect(ctx, -GOAL_W / 2 + 14, -GOAL_H + 16, GOAL_W - 28, 7, 3);
   ctx.fill();
   drawEmoji(ctx, f.done ? '✅' : '📒', 0, -GOAL_H / 2 + 8, 20);
+}
+
+// a goal before the last: a mailbox on a post; its flag goes up once the stickers are posted
+const MAIL = { w: 70, top: -GOAL_H - 28, bottom: -56 };
+function drawMailbox(f, t) {
+  // the box sits above the ground pin in front of it
+  const { w: bw, top, bottom } = MAIL, r = bw / 2;
+  // post
+  ctx.fillStyle = '#9a6a3f';
+  ctx.strokeStyle = '#6e4a2a';
+  ctx.lineWidth = 3;
+  roundRect(ctx, -7, bottom - 4, 14, -bottom + 4, 3);
+  ctx.fill();
+  ctx.stroke();
+  // box: flat bottom, round top
+  ctx.fillStyle = '#4d9de0';
+  ctx.strokeStyle = '#2b6aa8';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-r, bottom);
+  ctx.lineTo(-r, top + r);
+  ctx.arc(0, top + r, r, Math.PI, 0);
+  ctx.lineTo(r, bottom);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.5, top + r * 0.55, 5, 9, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  // slot
+  ctx.fillStyle = '#1d3f66';
+  roundRect(ctx, -r * 0.55, top + r * 0.75, r * 1.1, 7, 3);
+  ctx.fill();
+  drawEmoji(ctx, f.done ? '✅' : '✉️', 0, (top + r + bottom) / 2 + 6, 12);
+  // flag on the side: flat until posted, then up
+  ctx.save();
+  ctx.translate(r - 2, (top + r + bottom) / 2);
+  ctx.rotate((-Math.PI / 2) * f.flag + Math.sin(t * 6) * 0.04 * f.flag);
+  ctx.fillStyle = '#6e4a2a';
+  roundRect(ctx, -3, -3, 32, 6, 3);
+  ctx.fill();
+  ctx.fillStyle = f.done ? '#3bceac' : '#ff5d8f';
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 2;
+  roundRect(ctx, 20, -14, 18, 16, 4);
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
-  // slots above the goal
-  if (f.done) return;
-  const slots = goalSlots(g);
-  slots.forEach((sl, i) => {
-    const fill = G.slotFill[sl.id];
-    const miss = f.shake > 0 && f.missing && f.missing.has(sl.id);
-    const bob = Math.sin(t * 2.5 + i) * 4;
-    const x = sl.x + (miss ? sx : 0), y = sl.y + bob;
-    if (G.album && G.album.owns() && fill === null) return;
-    ctx.save();
-    ctx.globalAlpha = current ? 1 : 0.5;
-    ctx.fillStyle = miss ? 'rgba(229, 72, 77, 0.35)' : 'rgba(255,255,255,0.55)';
-    ctx.beginPath();
-    ctx.arc(x, y, 30, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.setLineDash([7, 6]);
-    ctx.lineDashOffset = -t * 15;
-    ctx.strokeStyle = miss ? '#e5484d' : 'rgba(90, 100, 130, 0.6)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-    if (G.album && G.album.owns()) return; // the album draws them while it is open
-    if (fill) drawEmoji(ctx, stick(sl.id), x, y, 25 * fill.s, 'sticker');
-    else drawEmoji(ctx, stick(sl.id), x, y, 22, 'ghost', 0, current ? 0.45 : 0.25);
-  });
 }
 
 function pinPulse() {
@@ -1146,11 +1280,11 @@ function drawHUD() {
     ctx.stroke();
     ctx.restore();
     const spent = G.spent.has(h.id);
-    if (h.got && !spent) drawEmoji(ctx, G.L.page.stickers[h.kind], p.x, p.y, sz * 0.36 * h.s, 'sticker', Math.sin(G.time * 2 + i) * 0.08);
+    if (h.got && !spent) drawEmoji(ctx, G.L.stickers[h.kind], p.x, p.y, sz * 0.36 * h.s, 'sticker', Math.sin(G.time * 2 + i) * 0.08);
     else if (spent) {
-      drawEmoji(ctx, G.L.page.stickers[h.kind], p.x, p.y, sz * 0.3, 'sticker', 0, 0.35);
+      drawEmoji(ctx, G.L.stickers[h.kind], p.x, p.y, sz * 0.3, 'sticker', 0, 0.35);
       drawEmoji(ctx, '✔️', p.x + sz * 0.28, p.y + sz * 0.28, sz * 0.16);
-    } else drawEmoji(ctx, G.L.page.stickers[h.kind], p.x, p.y, sz * 0.3, 'ghost', 0, 0.35);
+    } else drawEmoji(ctx, G.L.stickers[h.kind], p.x, p.y, sz * 0.3, 'ghost', 0, 0.35);
   });
 }
 
@@ -1287,7 +1421,7 @@ function drawWipe() {
 
 // ---------- boot ----------
 const ui = initUI({
-  levels: LEVELS.map((l) => ({ name: l.name, title: l.page.title })),
+  levels: LEVELS.map((l) => ({ name: l.name, title: l.title })),
   progress: () => G.progress,
   onPlay: () => startIntro(),
   onRestart: () => restart(),
@@ -1305,17 +1439,23 @@ const ui = initUI({
     startIntro();
   },
   onSkip: () => skipToBoard(),
+  onAlbum: () => openBrowse(),
   onResetProgress: () => {
     G.progress = 0;
     try {
       localStorage.removeItem('hopper.progress');
     } catch {}
+    album.reset();
+    setHat(null);
+    updateBadge();
   },
   paused: (v) => (G.paused = v),
 });
 
 loadLevel(Math.min(G.progress, LEVELS.length - 1));
 G.mode = 'title';
+setHat(album.hat);
+updateBadge();
 ui.showButtons(false);
 requestAnimationFrame(frame);
 
@@ -1340,17 +1480,13 @@ window.HOP = {
   get mode() {
     return G.mode;
   },
-  place: (item = 0, slot) => {
-    const A = G.album;
-    if (!A || A.phase !== 'play') return false;
-    const it = A.items[item];
-    const slots = A.parts.filter((p) => p.slot && !p.filled);
-    const p = slot == null ? slots.find((q) => q.kind === it.kind) : A.parts[slot];
-    if (!it || !p) return false;
-    A.tryPlace(it, p);
-    return true;
-  },
+  // album: stick the next sheet sticker in, close the book (Later / continue), open the album screen
+  place: () => !!G.album && G.album.placeNext(),
   closeAlbum: () => G.album && G.album.close(),
+  album: () => openBrowse(),
+  get book() {
+    return G.album;
+  },
   go: (i) => {
     document.getElementById('title').hidden = true;
     loadLevel(i);
