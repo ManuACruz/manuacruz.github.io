@@ -2,7 +2,6 @@
 // Pure presentation: reads the sim's character, never changes it.
 import { R } from './sim.js';
 import { spring, clamp, lerp, ease, rand } from './fx.js';
-import { drawEmoji } from './sprites.js';
 
 const C = {
   body: '#93d64f',
@@ -18,7 +17,6 @@ const C = {
 
 export class Blob {
   constructor() {
-    this.hat = null; // an emoji worn on top (won by filling an album page)
     this.reset(0, 0);
   }
 
@@ -346,7 +344,6 @@ export class Blob {
     ctx.fill();
 
     this.drawMouth(ctx);
-    if (this.hat) drawEmoji(ctx, this.hat, 3, -68 - this.wob * 3, 30, 'plain', -0.1 + Math.sin(this.t * 3) * 0.03 * this.wob);
   }
 
   drawEye(ctx, e, r, i) {

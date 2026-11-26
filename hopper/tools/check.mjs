@@ -5,7 +5,6 @@ import { CamSpots } from '../src/cam.js';
 import { LEVELS } from '../src/levels.js';
 import { DEFAULTS } from '../src/tune.js';
 import { frameLevel } from './framing.mjs';
-import { stickerProblems } from '../src/stickers.js';
 
 const args = process.argv.slice(2);
 const arg = (k, d) => {
@@ -98,12 +97,6 @@ LEVELS.forEach((raw, i) => {
   checkSolution(L);
   if (RUNS > 0) randomPlayers(L);
 });
-
-// every sticker has a spot on its world's album spread
-const sp = stickerProblems();
-for (const p of sp) console.log('album: ' + p);
-if (sp.length) failures++;
-else console.log('\nalbum: every sticker has a spot');
 
 if (failures) {
   console.log(`\n${failures} problem(s)`);

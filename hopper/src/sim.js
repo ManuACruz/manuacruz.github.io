@@ -18,10 +18,7 @@ export function scaleLevel(raw) {
   const L = {
     raw,
     name: raw.name,
-    id: raw.id,
-    world: raw.world,
-    title: raw.title,
-    stickers: raw.stickers,
+    page: raw.page,
     unit: u,
     w: raw.size[0] * u,
     h: raw.size[1] * u,
@@ -29,7 +26,7 @@ export function scaleLevel(raw) {
     blocks: raw.blocks.map(([x, y, w, h], i) => ({ i, x: x * u, y: y * u, w: w * u, h: h * u })),
     pins: raw.pins.map((p, i) => ({ i, id: p.id, t: p.t, x: p.x * u, y: p.y * u, len: p.len ? p.len * u : null, angle: p.angle ?? null })),
     items: raw.items.map((it, i) => ({ i, id: it.id, kind: it.kind, x: it.x * u, y: it.y * u })),
-    goals: raw.goals.map((g, i) => ({ i, x: g.at[0] * u, y: g.at[1] * u, items: g.items })),
+    goals: raw.goals.map((g, i) => ({ i, x: g.at[0] * u, y: g.at[1] * u, items: g.items, board: g.board })),
     cams: (raw.cams || []).map(([x, y, z]) => ({ x: x * u, y: y * u, z: z || 1 })),
     solution: raw.solution || [],
   };
@@ -416,7 +413,7 @@ export class Sim {
     }
   }
 
-  // After a won goal: next goal, new checkpoint. Returns true when the level is finished.
+  // After the board for a won goal: next goal, new checkpoint. Returns true when the level is finished.
   completeGoal() {
     const g = this.L.goals[this.goal];
     const ch = this.ch;

@@ -28,6 +28,7 @@ export const DEFAULTS = {
   introT: 1.3,
   introHold: 0.8,
   panSpeed: 1300,
+  factMin: 0.7,
   nextT: 2.6,
   clueT: 5,
   wallClueT: 1.2,

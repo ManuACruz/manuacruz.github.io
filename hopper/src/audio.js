@@ -144,32 +144,4 @@ export const sfx = {
   swing: () => noise({ dur: 0.22, vol: 0.035, f0: 400, f1: 900, q: 1 }),
   page: () => noise({ dur: 0.35, vol: 0.1, f0: 1200, f1: 3000, q: 0.5 }),
   click: () => tone({ type: 'triangle', f0: 1000, f1: 700, dur: 0.05, vol: 0.12 }),
-  // album
-  book: () => {
-    noise({ dur: 0.3, vol: 0.08, f0: 600, f1: 1800, q: 0.6 });
-    tone({ type: 'sine', f0: 140, f1: 70, dur: 0.18, vol: 0.25, at: 0.38 });
-    noise({ dur: 0.1, vol: 0.08, f0: 500, f1: 200, q: 0.6, type: 'lowpass', at: 0.38 });
-  },
-  flip: () => {
-    noise({ dur: 0.22, vol: 0.09, f0: vary(900), f1: 3200, q: 0.6 });
-    noise({ dur: 0.08, vol: 0.05, f0: 2400, f1: 1200, q: 1, at: 0.2 });
-  },
-  peel: () => {
-    noise({ dur: 0.16, vol: 0.09, f0: 2500, f1: 6000, q: 2 });
-    tone({ type: 'sine', f0: vary(400), f1: 900, dur: 0.1, vol: 0.1 });
-  },
-  pop: (k = 1) => {
-    tone({ type: 'sine', f0: 520 * k, f1: 900 * k, dur: 0.09, vol: 0.2 });
-    tone({ type: 'triangle', f0: 1040 * k, dur: 0.12, vol: 0.06, at: 0.05 });
-  },
-  hat: () => {
-    [659, 784, 988, 1319].forEach((f, i) => tone({ type: 'square', f0: f, dur: 0.12, vol: 0.06, at: i * 0.07 }));
-    [784, 1319].forEach((f) => tone({ type: 'triangle', f0: f, dur: 0.6, vol: 0.12, at: 0.3 }));
-  },
-  mail: () => {
-    tone({ type: 'square', f0: 160, f1: 90, dur: 0.12, vol: 0.12 });
-    noise({ dur: 0.1, vol: 0.12, f0: 900, f1: 300, q: 0.8 });
-    tone({ type: 'triangle', f0: 1568, dur: 0.4, vol: 0.12, at: 0.18 });
-    tone({ type: 'triangle', f0: 2093, dur: 0.5, vol: 0.08, at: 0.26 });
-  },
 };
