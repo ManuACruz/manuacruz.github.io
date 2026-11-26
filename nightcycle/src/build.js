@@ -1,7 +1,7 @@
 // Turns the level data into a three.js scene: floors, walls, windows, doors, furniture and lights.
 
 import * as THREE from 'three';
-import { HOUSE, ROOMS, FURNITURE, LIGHTS, NIGHTLIGHTS } from './level.js';
+import { HOUSE, ROOMS, FURNITURE, LIGHTS, NIGHTLIGHTS, SCRAPES, DECOR, CEILING } from './level.js';
 import { makeTextures, makeStatic } from './textures.js';
 import { roundBox, drapeGeo, lump, lathe, strip, pipe, stadium, extrudeUp, noise3 } from './props.js';
 
@@ -318,28 +318,95 @@ export function buildHouse(scene, world, opts = {}) {
     m.position.set(dir * 0.42, 0.24, 0.026);
     pv.add(m);
   }
-  // The pet flap at the end of the hall: just big enough for a robot.
-  if (world.flap) {
-    const f = world.flap, cx = (f.from + f.to) / 2, L = f.to - f.from;
+  // Pet flaps: the one at the end of the hall, just big enough for a robot, and on Night 5 Biscuit's old dog
+  // door to the garden (screwed shut with plywood until the story takes it off).
+  house.flaps = [];
+  for (const f of world.flaps) {
+    const cx = (f.from + f.to) / 2, L = f.to - f.from;
     const frameMat = std({ color: 0xcfc6b0, roughness: 0.5 });
+    const grp = new THREE.Group();   // drawn along x; turned for a wall along z
+    if (f.along === 'z') { grp.position.set(f.at, 0, cx); grp.rotation.y = Math.PI / 2; } else grp.position.set(cx, 0, f.at);
     for (const side of [-1, 1]) {
-      const z = f.at + side * (HOUSE.wallT / 2 + 0.0075);   // just proud of the skirting's face
-      for (const [w, h, x, y] of [[L + 0.08, 0.04, cx, f.top + 0.02], [0.04, f.top + 0.04, f.from - 0.02, (f.top + 0.04) / 2], [0.04, f.top + 0.04, f.to + 0.02, (f.top + 0.04) / 2]]) {
+      const z = side * (HOUSE.wallT / 2 + 0.0075);   // just proud of the skirting's face
+      for (const [w, h, x, y] of [[L + 0.08, 0.04, 0, f.top + 0.02], [0.04, f.top + 0.04, -L / 2 - 0.02, (f.top + 0.04) / 2], [0.04, f.top + 0.04, L / 2 + 0.02, (f.top + 0.04) / 2]]) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.012), frameMat);
         m.position.set(x, y, z);
-        scene.add(m);
+        grp.add(m);
       }
     }
     const pivot = new THREE.Group();
-    pivot.position.set(cx, f.top - 0.005, f.at);
+    pivot.position.set(0, f.top - 0.005, 0);
     const flap = new THREE.Mesh(new THREE.BoxGeometry(L - 0.01, f.top - 0.02, 0.006), new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 0.3, transparent: true, opacity: 0.82 }));
     flap.position.y = -(f.top - 0.02) / 2;
     pivot.add(flap);
     pivot.userData.dynamic = true;
-    scene.add(pivot);
-    pivot.updateMatrixWorld(true);
-    house.petFlap = pivot;
-    house.tags.push({ label: 'pet door', box: new THREE.Box3().setFromObject(flap).expandByScalar(0.03), conf: 0.81, obj: flap });
+    grp.add(pivot);
+    if (f.outside) {   // plywood screwed over the inside, for as long as the block is there
+      const board = new THREE.Group();
+      const ply = new THREE.Mesh(boxGeo(L + 0.14, f.top + 0.1, 0.015, 0.5), std({ map: tx.furnWood, color: 0xc8b08a, roughness: 0.9 }));
+      ply.position.set(0, (f.top + 0.1) / 2, HOUSE.wallT / 2 + 0.022);
+      board.add(ply);
+      for (const [sx, sy] of [[-1, 0.15], [1, 0.15], [-1, 0.85], [1, 0.85]]) {
+        const sc = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.004, 8), M.metal);
+        sc.rotation.x = Math.PI / 2;
+        sc.position.set(sx * (L / 2 + 0.04), sy * (f.top + 0.1), HOUSE.wallT / 2 + 0.031);
+        board.add(sc);
+      }
+      board.userData.dynamic = true;
+      board.visible = Object.keys(world.blocks).length > 0;
+      grp.add(board);
+      house.dogFlapBoard = board;
+    }
+    scene.add(grp);
+    grp.updateMatrixWorld(true);
+    house.flaps.push({ pivot, x: f.along === 'z' ? f.at : cx, z: f.along === 'z' ? cx : f.at, along: f.along });
+    house.tags.push({ label: f.outside ? 'dog door' : 'pet door', box: new THREE.Box3().setFromObject(flap).expandByScalar(0.03), conf: 0.81, obj: flap });
+  }
+  house.petFlap = house.flaps[0]?.pivot;
+
+  // ---------- holes torn through walls (Night 2) ----------
+  // Torn paper and broken plasterboard round the opening on both faces, shards of it sticking into the gap,
+  // and the pieces on the floor either side.
+  for (const h of world.holes) {
+    const L = h.to - h.from, c = (h.from + h.to) / 2;
+    const W = L + 0.7, H = Math.min(HOUSE.wallH - 0.08, h.top + 0.35);
+    const mat = new THREE.MeshStandardMaterial({ map: tx.holeRim(W, H, L, h.top), transparent: true, roughness: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    // u runs along the wall, n out of it (n > 0: toward larger x or z)
+    const at = (u, y, n) => (h.along === 'z' ? new THREE.Vector3(h.at + n, y, u) : new THREE.Vector3(u, y, h.at + n));
+    const turn = h.along === 'z' ? Math.PI / 2 : 0;
+    for (const side of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(W, H), mat);
+      m.position.copy(at(c, H / 2, side * (HOUSE.wallT / 2 + 0.004)));
+      m.rotation.y = h.along === 'z' ? side * Math.PI / 2 : (side > 0 ? 0 : Math.PI);
+      m.userData.noShadow = true;
+      scene.add(m);
+    }
+    const plaster = std({ color: 0xcfc8b8, roughness: 1 });
+    const shard = (u, y, du, dy, tilt) => {   // du, dy: size along the wall and up; the depth is just inside the wall's
+      const m = new THREE.Mesh(new THREE.BoxGeometry(du, dy, HOUSE.wallT - 0.016), plaster);
+      m.position.copy(at(u, y, (rnd() - 0.5) * 0.004));
+      m.rotation.set(0, turn, tilt);
+      m.castShadow = true;
+      scene.add(m);
+    };
+    for (const [edge, dir] of [[h.from, 1], [h.to, -1]]) {   // the sides: shards poking in, fewer low down where it squeezes through
+      for (let k = 0; k < 6; k++) {
+        const y = k < 1 ? 0.08 + rnd() * 0.25 : 0.55 + rnd() * (h.top - 0.7), poke = k < 1 ? 0.02 + rnd() * 0.02 : 0.03 + rnd() * 0.06;
+        shard(edge + dir * (poke / 2 - 0.012), y, poke + 0.024, 0.05 + rnd() * 0.14, (rnd() - 0.5) * 0.6);
+      }
+    }
+    for (let k = 0; k < 7; k++) {   // the top edge hangs down in broken teeth
+      const hang = 0.03 + rnd() * 0.11;
+      shard(h.from + 0.06 + rnd() * (L - 0.12), h.top - hang / 2 + 0.012, 0.05 + rnd() * 0.12, hang + 0.024, (rnd() - 0.5) * 0.5);
+    }
+    const chunk = std({ color: 0xd8d2c2, roughness: 1 });
+    for (let k = 0; k < 22; k++) {   // pieces on the floor, both sides and in the gap
+      const s = 0.025 + rnd() * 0.06, n = (rnd() - 0.5) * 1.4, u = c + (rnd() - 0.5) * (Math.abs(n) < 0.1 ? L * 0.8 : L + 0.5);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(s, 0.012, s * (0.5 + rnd())), chunk);
+      m.position.copy(at(u, 0.006, n));
+      m.rotation.set((rnd() - 0.5) * 0.3, rnd() * 3, (rnd() - 0.5) * 0.3);
+      scene.add(m);
+    }
   }
 
   // ---------- furniture ----------
@@ -478,6 +545,21 @@ export function buildHouse(scene, world, opts = {}) {
       }
     }
   }
+  // Marks gouged into the floor where something heavy was dragged: two pale scratches per foot.
+  if (SCRAPES.length) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xc8a878, transparent: true, opacity: 0.45, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -1.5 });
+    for (const [ax, az, bx, bz] of SCRAPES) {
+      const len = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(bz - az, bx - ax);
+      for (const off of [-0.017, 0.016]) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 0.007), mat);
+        m.rotation.order = 'YXZ';
+        m.rotation.set(-Math.PI / 2, -yaw, 0);
+        m.position.set((ax + bx) / 2 - Math.sin(yaw) * off, 0.0035, (az + bz) / 2 + Math.cos(yaw) * off);
+        m.userData.noShadow = true;
+        scene.add(m);
+      }
+    }
+  }
   // Plug-in nightlights: a warm lens and a soft glow on the wall and floor (no real light: lights cost every pixel).
   house.nightlights = NIGHTLIGHTS.map((n) => {
     const out = n.facing === 'n' ? [0, -1] : n.facing === 's' ? [0, 1] : n.facing === 'e' ? [1, 0] : [-1, 0];
@@ -500,12 +582,77 @@ export function buildHouse(scene, world, opts = {}) {
     scene.add(g);
     return { x: n.x + out[0] * 0.05, z: n.z + out[1] * 0.05, lensMat, glows: [wallGlow.material, floorGlow.material], alive: true, dying: 0 };
   });
-  for (const r of ROOMS) {  // dead ceiling lights
+  // Ceiling lights: dead, except on the nights the power is back on (CEILING), when it can switch them on.
+  // Each of those has a light that is removed from the scene until it is lit (every light costs every pixel).
+  house.roomLights = {};
+  ROOMS.forEach((r, ri) => {
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.glass.clone());
     lamp.material.opacity = 0.5;
     lamp.rotation.x = Math.PI;
     lamp.position.set((r.x0 + r.x1) / 2, HOUSE.wallH, (r.z0 + r.z1) / 2);
     scene.add(lamp);
+    if (!CEILING.includes(r.id)) return;
+    lamp.userData.dynamic = true;
+    lamp.material.emissive = new THREE.Color(0xffe2b8);
+    lamp.material.emissiveIntensity = 0;
+    const light = new THREE.PointLight(0xffe2b8, 0, 7.5, 2);
+    light.position.set((r.x0 + r.x1) / 2, HOUSE.wallH - 0.3, (r.z0 + r.z1) / 2);
+    light.visible = false;
+    light.userData.base = r.id === 'hall' ? 7 : 9;
+    scene.add(light);
+    house.roomLights[ri] = { light, dome: lamp.material };
+  });
+
+  // ---------- decor: things on the walls and floor that some nights add ----------
+  for (const dc of DECOR) {
+    if (dc.kind === 'photo') {   // a family photo in a frame; back: turned to face the wall
+      const g = new THREE.Group();
+      B(g, 0.3, 0.38, 0.02, 0, -0.19, 0.01, dc.back ? M.card : M.wood);
+      if (!dc.back) {
+        const pic = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.3), std({ map: tx.polaroid, roughness: 0.4 }));
+        pic.position.set(0, 0, 0.021);
+        g.add(pic);
+      }
+      g.position.set(dc.x, dc.y, dc.z + (dc.facing === 's' ? 0.003 : -0.003));
+      g.rotation.set(0, dc.facing === 'n' ? Math.PI : 0, dc.tilt || 0);
+      scene.add(g);
+      if (!dc.back) house.tags.push({ label: 'photo', box: new THREE.Box3().setFromObject(g), conf: 0.7, obj: g });
+    } else if (dc.kind === 'tableLamp') {   // a bedside lamp: off, until something wants you to see
+      const g = new THREE.Group();
+      C(g, 0.07, 0.08, 0.025, 0, 0, 0, M.brass, 16);
+      C(g, 0.012, 0.012, 0.28, 0, 0.025, 0, M.brass, 8);
+      house.bedLampShade = std({ color: 0xe8dcc0, roughness: 0.9, side: THREE.DoubleSide, emissive: new THREE.Color(0xffc080), emissiveIntensity: 0 });
+      C(g, 0.08, 0.13, 0.17, 0, 0.26, 0, house.bedLampShade, 20).geometry = new THREE.CylinderGeometry(0.08, 0.13, 0.17, 20, 1, true);
+      g.position.set(dc.x, dc.y, dc.z);
+      g.userData.dynamic = true;
+      scene.add(g);
+      house.tags.push({ label: 'lamp', box: new THREE.Box3().setFromObject(g), conf: 0.83, obj: g });
+    } else if (dc.kind === 'plywood') {   // where the hole was: a sheet of plywood screwed over it, laundry side
+      const ply = new THREE.Mesh(boxGeo(0.015, dc.h, dc.w, 0.5), std({ map: tx.furnWood, color: 0xc8b08a, roughness: 0.9 }));
+      ply.position.set(dc.x, dc.h / 2, dc.z);
+      scene.add(ply);
+      for (const [dz, y] of [[-1, 0.15], [1, 0.15], [-1, dc.h - 0.12], [1, dc.h - 0.12], [-1, dc.h / 2], [1, dc.h / 2]]) {
+        const sc = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.004, 8), M.metal);
+        sc.rotation.z = Math.PI / 2;
+        sc.position.set(dc.x + 0.009, y, dc.z + dz * (dc.w / 2 - 0.05));
+        scene.add(sc);
+      }
+    } else if (dc.kind === 'bowl') {   // its bowl, in its room
+      const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.11, 0.07, 18), M.metal);
+      bowl.position.set(dc.x, 0.035, dc.z);
+      const food = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.01, 18), std({ color: 0x5a3a20, roughness: 1 }));
+      food.position.set(dc.x, 0.065, dc.z);
+      scene.add(bowl, food);
+      house.tags.push({ label: 'bowl', box: new THREE.Box3().setFromObject(bowl), conf: 0.95, obj: bowl });
+    } else if (dc.kind === 'garden') {   // outside the dog door: wet grass in the dark
+      const t = tx.floor.carpet.clone();
+      t.repeat.set(30, 30); t.needsUpdate = true;
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), std({ map: t, color: 0x2a4020, roughness: 1 }));
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.set(7, -0.003, 5);
+      ground.receiveShadow = true;
+      scene.add(ground);
+    }
   }
 
   // ---------- lights ----------
@@ -525,6 +672,7 @@ export function buildHouse(scene, world, opts = {}) {
   point('tv', 0, 6);
   point('fridge', 0, 5);
   point('nightlight', 1.8, 3.5);
+  if (LIGHTS.bedLamp) { const p = point('bedLamp', 0, 4.5); p.userData.base = 5; p.visible = false; }
   {
     const d = world.doors.laundry;
     const p = new THREE.PointLight(0xffc870, 0.35, 1.6, 2);
@@ -691,17 +839,41 @@ function sheetOver(g, w, d, boxes, M, o) {
   m.userData.noScan = true;
   return m;
 }
+const std2 = (o) => new THREE.MeshStandardMaterial({ roughness: 0.85, ...o });
 const rnd = (() => { let a = 12345; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
 
 const BUILDERS = {
+  // The charging dock, and its lead up to the wall socket behind it. f.dead: unplugged, the lead on the floor.
   dock(g, w, d, f, M) {
     B(g, w, 0.12, d * 0.8, 0, 0, -d * 0.1, M.black);
     const plate = B(g, w, 0.006, 0.3, 0, 0, d / 2 + 0.1, M.black);
     plate.userData.noScan = true;
-    const led = B(g, 0.06, 0.012, 0.005, 0, 0.09, d * 0.3 + 0.002, new THREE.MeshBasicMaterial({ color: 0x30ff90 }));
+    const led = B(g, 0.06, 0.012, 0.005, 0, 0.09, d * 0.3 + 0.002, new THREE.MeshBasicMaterial({ color: f.dead ? 0x050505 : 0x30ff90 }));
     led.userData.noShadow = true;
     for (const s of [-1, 1]) B(g, 0.05, 0.004, 0.08, s * 0.08, 0.004, d / 2 + 0.06, M.metal);
-    return { dockLed: led };
+    // The wall socket is the one build() puts on every long wall, 0.1 m to the dock's left at 0.3 m.
+    const back = -d / 2, V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const cordMat = new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.6 });
+    const plug = () => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.045, 0.022), M.white); m.userData.noScan = true; return m; };
+    const plugIn = new THREE.Group(), plugOut = new THREE.Group();
+    const p1 = plug(); p1.position.set(-0.1, 0.3, back + 0.022); plugIn.add(p1);
+    plugIn.add(new THREE.Mesh(pipe([V(-0.1, 0.3, back + 0.034), V(-0.095, 0.25, back + 0.05), V(-0.075, 0.16, back + 0.06), V(-0.05, 0.118, back + 0.05)], 0.0035, 12, 5), cordMat));
+    const p2 = plug(); p2.position.set(-0.25, 0.017, d / 2 + 0.6); p2.rotation.set(Math.PI / 2, 0, 0.5); plugOut.add(p2);
+    plugOut.add(new THREE.Mesh(pipe([V(-0.05, 0.11, back + 0.05), V(-0.1, 0.03, d / 2 + 0.1), V(-0.2, 0.005, d / 2 + 0.35), V(-0.245, 0.006, d / 2 + 0.575)], 0.0035, 16, 5), cordMat));
+    plugIn.visible = !f.dead; plugOut.visible = !!f.dead;
+    for (const grp of [plugIn, plugOut]) { grp.userData.dynamic = true; g.add(grp); }
+    return f.dead ? {} : { dockLed: led, plugIn, plugOut, plugSpot: p2 };
+  },
+  // The basement hatch behind the dryer, open: a dark square going down, a ladder, the lid up against the wall.
+  hatch(g, w, d, f, M) {
+    const rim = std2({ color: 0x5a5048, roughness: 0.9 });
+    for (const [bw, bd, x, z] of [[w, 0.05, 0, -d / 2 + 0.025], [w, 0.05, 0, d / 2 - 0.025], [0.05, d, -w / 2 + 0.025, 0], [0.05, d, w / 2 - 0.025, 0]]) B(g, bw, 0.03, bd, x, 0, z, rim);
+    const pit = B(g, w - 0.1, 0.004, d - 0.1, 0, 0.001, 0, new THREE.MeshBasicMaterial({ color: 0x000000 }));
+    pit.userData.noShadow = true;
+    for (let k = 0; k < 2; k++) B(g, 0.03, 0.06, 0.03, (k ? 1 : -1) * 0.14, 0.0, d / 2 - 0.12, M.metal);   // ladder rails poking up
+    const lid = B(g, w, d - 0.04, 0.03, 0, 0, -d / 2 - 0.03, std2({ map: M.wood.map, color: 0x8a7a68, roughness: 0.8 }));
+    lid.rotation.x = -0.12;
+    C(g, 0.03, 0.03, 0.012, 0.15, 0.32, -d / 2 - 0.004, M.metal).rotation.x = Math.PI / 2;   // the hasp, cut
   },
   // Half-packed: some shelves still full, some cleared, a stack lying flat, a few leaning.
   bookshelf(g, w, d, f, M) {
@@ -771,6 +943,39 @@ const BUILDERS = {
     else for (const b of [...boxes, ...top]) RB(g, b.x1 - b.x0, b.h - 0.15, b.z1 - b.z0, 0.04, (b.x0 + b.x1) / 2, 0.15, (b.z0 + b.z1) / 2, M.fabric);
     // under-side slats
     for (let k = 0; k < 5; k++) B(g, w - 0.1, 0.02, 0.06, 0, 0.15, -d / 2 + 0.12 + k * (d - 0.24) / 4, M.wood);
+  },
+  // Night 2: on its back across the arch, the underside and the legs to the room. The sheet is on the floor.
+  sofaTipped(g, w, d, f, M) {
+    const inner = new THREE.Group();
+    BUILDERS.sofa(inner, w, 0.9, { ...f, sheet: false }, M);
+    // the black dust cloth stapled under the frame, now facing the room, torn along one side
+    const cloth = new THREE.MeshStandardMaterial({ map: M.fabric.map, color: 0x26221e, roughness: 1 });
+    inner.traverse((o) => { if (o.isMesh && o.material === M.underside) o.material = cloth; });
+    for (const s of [-1, 1]) B(inner, w - 0.02, 0.05, 0.05, 0, 0.15, s * (0.45 - 0.035), M.wood);   // the frame rails
+    inner.rotation.x = -Math.PI / 2;   // the back goes down, the bottom comes round to the front
+    inner.position.set(0, 0.45, d / 2);
+    g.add(inner);
+  },
+  // Night 2: the coffee table upside down, legs in the air, the mug rolled off.
+  tableFlipped(g, w, d, f, M) {
+    const inner = new THREE.Group();
+    legs(inner, w, d, 0.38, M.wood, 0.045);
+    B(inner, w, 0.04, d, 0, 0.38, 0, M.wood);
+    inner.rotation.z = Math.PI;
+    inner.position.y = 0.42;
+    g.add(inner);
+    const mug = G(g, new THREE.CylinderGeometry(0.04, 0.035, 0.09, 12), M.white, w / 2 + 0.14, 0.04, d * 0.2);
+    mug.rotation.set(0, 0.6, Math.PI / 2);
+    mug.userData.noScan = true;
+  },
+  // The dust sheet pulled off the sofa, left in a heap.
+  sheetHeap(g, w, d, f, M) {
+    const boxes = [
+      { x0: -w * 0.42, x1: w * 0.05, z0: -d * 0.35, z1: d * 0.2, h: 0.055 },
+      { x0: -w * 0.05, x1: w * 0.38, z0: -d * 0.1, z1: d * 0.38, h: 0.04 },
+      { x0: -w * 0.2, x1: w * 0.2, z0: -d * 0.45, z1: -d * 0.15, h: 0.03 },
+    ];
+    sheetOver(g, w * 0.8, d * 0.8, boxes, M, { hang: 0.1, hem: 0.004, seed: 17, fold: 0.03, soft: 0.1 });
   },
   coffeeTable(g, w, d, f, M) {
     legs(g, w, d, 0.38, M.wood, 0.045);

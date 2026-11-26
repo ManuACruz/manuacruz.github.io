@@ -3,7 +3,7 @@
 // It can get an arm under, though, if you make noise right next to it.
 
 import * as THREE from 'three';
-import { ROOMS } from './level.js';
+import { ROOMS, DOCK, LAIR, RULES, PLACES } from './level.js';
 import { T } from './tune.js';
 import { LongMan } from './longman.js';
 
@@ -38,13 +38,15 @@ export class Entity {
     this.state = 'dormant';
     this.path = null; this.speed = 0; this.phase = 0; this.lastPlant = 0;
     this.suspicion = 0; this.litTime = 0; this.lostTimer = 0; this.repath = 0; this.wait = 0;
-    this.grace = 0; this.calm = 0; this.lastSeen = null; this.target = null; this.lookYaw = 0;
+    this.grace = 0; this.calm = 0; this.truce = 0; this.lastSeen = null; this.target = null; this.lookYaw = 0;
     this.poseTimer = 0; this.twitch = 0; this.twitchRoll = 0; this.sinceNear = 0;
     this.posed = false; this.canSee = false; this.dist = undefined; this.stuck = 0; this.searchFrom = null;
     this.noticed = false; this.noticeAge = 0; this.snapT = 0; this.freeze = 0; this.lookTarget = null; this.stare = false;
     this.menace = 0; this.linger = 0; this.feinted = false; this.checking = null; this.coverUse = {};
     this.hallCross = 0; this.lastCross = -100; this.crossing = false; this.pathStartX = 0;
     this.reachT = 0; this.reachAim = null; this.atEnd = false; this.lairT = 0; this.retreating = false;
+    this.dockWatch = false; this.watchingDock = false; this.dockNext = false; this.blockT = 0; this.scriptYield = false;
+    this.hungry = false; this.crunchT = 0;
     this.root.visible = false;
     this.scareT = -1;
     this.duck = 0;
@@ -55,8 +57,10 @@ export class Entity {
 
   // ---------- control from the story ----------
 
-  walkScript(points, speed, onDone) {
+  // yieldTo: if the robot is right in front of it, it stops over it and looks down for a moment, then walks on.
+  walkScript(points, speed, onDone, yieldTo = false) {
     this.state = 'script';
+    this.scriptYield = yieldTo; this.blockT = 0;
     this.root.visible = true;
     this.x = points[0][0]; this.z = points[0][1];
     this.path = points.slice(1).map((p) => [...p]);
@@ -95,7 +99,7 @@ export class Entity {
   hear(x, z, radius, kind) {
     const g = this.game;
     if (this.state === 'lair') { g.lairHeard?.(x, z, radius, kind); return; }
-    if (!this.active || this.state === 'chase' || this.state === 'reach') return;
+    if (!this.active || this.state === 'chase' || this.state === 'reach' || this.truce > 0) return;
     let d = Math.hypot(x - this.x, z - this.z);
     if (!g.world.los(this.x, this.z, x, z)) d *= T.occlusion;
     const r = radius * (this.grace > 0 || this.calm > 0 ? 0.5 : 1) * g.diff().hearing;
@@ -121,6 +125,7 @@ export class Entity {
     this.wait = 3 + Math.random() * 1.5;
     this.arrived = false;
     this.checking = null;
+    this.watchingDock = false;
     // It stops, turns its head toward the sound, then goes, faster than it walks.
     if (was === 'patrol' || was === 'check') { this.freeze = 0.6; this.lookTarget = [x, z]; this.poseTimer = 0; }
   }
@@ -144,7 +149,8 @@ export class Entity {
     this.dist = dist;
     let see = false;
     if (!r.hidden && !g.debug.ghost && !r.dead) {
-      const range = (r.light ? T.entSeeLit : T.entSeeDark) * g.diff().sight;
+      const lit = r.light || !!g.roomLit?.(r.x, r.z);   // a room with its light on shows you as well as your headlamp does
+      const range = (lit ? T.entSeeLit : T.entSeeDark) * g.diff().sight;
       if (dist < range) {
         const c = (dx * Math.sin(this.yaw) + dz * Math.cos(this.yaw)) / dist;
         if ((c > Math.cos(T.entFov) || dist < 1.3) && this.sightLine(r.x, r.z, dist)) see = true;
@@ -155,6 +161,7 @@ export class Entity {
     this.litTime = lit ? this.litTime + dt : Math.max(0, this.litTime - dt);
     const byLamp = this.litTime > T.entLitNotice && !r.hidden;
     if (byLamp) see = true;
+    if (this.truce > 0 && dist > 1.0) see = false;   // in a truce it only notices you if you drive into it
 
     if (see) {
       if (!this.noticed) {
@@ -162,8 +169,9 @@ export class Entity {
         this.snapT = 0.5; this.poseTimer = 0;   // the head snaps round, with a crack
         const hp = this.j.head.getWorldPosition(new THREE.Vector3());
         g.audio.crack(hp.x, hp.y, hp.z);
-        g.incident(byLamp ? 'lampFace' : r.light ? 'lampSeen' : 'dark',
-          byLamp ? `Headlamp aimed at [NO MATCH] ${this.litTime.toFixed(1)} s` : r.light ? `Headlamp visible at ${dist.toFixed(1)} m` : `Unit visible at ${dist.toFixed(1)} m (lamp off)`);
+        const roomLit = !r.light && g.roomLit?.(r.x, r.z);
+        g.incident(byLamp ? 'lampFace' : r.light ? 'lampSeen' : roomLit ? 'roomLit' : 'dark',
+          byLamp ? `Headlamp aimed at [NO MATCH] ${this.litTime.toFixed(1)} s` : r.light ? `Headlamp visible at ${dist.toFixed(1)} m` : roomLit ? `Unit visible at ${dist.toFixed(1)} m (room lights on)` : `Unit visible at ${dist.toFixed(1)} m (lamp off)`);
         g.onEntityNotice?.();
       }
       this.suspicion = Math.min(1.5, this.suspicion + dt / (T.entNotice * clamp(dist / 4, 0.3, 1.5)));
@@ -188,19 +196,33 @@ export class Entity {
     if (!this.active) this.canSee = false;
     this.grace = Math.max(0, this.grace - dt);
     this.calm = Math.max(0, this.calm - dt);
+    this.truce = Math.max(0, this.truce - dt);
     this.linger = Math.max(0, this.linger - dt);
     this.snapT = Math.max(0, this.snapT - dt);
     let speed = 0;
 
     if (this.state === 'lair') {
       this.lairT -= dt;
-      if (this.lairT <= 0) { this.state = 'patrol'; this.root.visible = true; this.wait = 0.5; this.path = null; g.onLeaveLair?.(); }
-      else { this.root.visible = false; return; }
+      if (LAIR.eat) {   // Night 5: it stands at its bowl, bent over it, eating; it looks up if you come in
+        const r = g.roomba;
+        this.crunchT -= dt;
+        if (this.crunchT <= 0) { this.crunchT = 0.9 + Math.random() * 1.2; g.audio.crunchAt?.(PLACES.bowl[0], PLACES.bowl[2]); }
+        if (!r.hidden && !g.debug.ghost && this.dist < 3 && g.world.los(this.x, this.z, r.x, r.z)) { this.lairT = 0; this.suspicion = 0.9; }
+      }
+      if (this.lairT <= 0) {
+        this.state = 'patrol'; this.root.visible = true; this.wait = 0.5; this.path = null;
+        if (this.posed) { this.body.resetPose(); this.posed = false; }
+        g.onLeaveLair?.();
+      } else { this.root.visible = !!LAIR.eat; return; }
     }
 
     if (this.state === 'script') {
       speed = this.scriptSpeed;
-      if (this.follow(dt, speed)) {
+      const r = g.roomba;
+      const inWay = this.scriptYield && this.dist < 0.8 && (r.x - this.x) * Math.sin(this.yaw) + (r.z - this.z) * Math.cos(this.yaw) > 0;
+      if (inWay && this.blockT < 3) { this.blockT += dt; speed = 0; this.stare = true; }
+      else if (this.scriptYield && this.stare) this.stare = false;
+      if (speed > 0 && this.follow(dt, speed)) {
         const cb = this.onScriptDone;
         this.onScriptDone = null;
         this.state = 'still';
@@ -226,7 +248,7 @@ export class Entity {
         if (!see) {
           if (!this.path || !this.path.length) {
             this.wait -= dt;
-            this.lookAround(dt);
+            if (this.watchingDock) this.lookAt(DOCK.x, DOCK.z, dt * 2); else this.lookAround(dt);
             speed = 0;
             if (this.wait <= 0) this.pickPatrol();
           } else if (this.follow(dt, speed)) this.arrive();
@@ -437,6 +459,15 @@ export class Entity {
       this.state = 'lair';
       this.lairT = rand(20, 30);
       this.menace = 0.25;
+      this.hungry = false;
+      if (LAIR.eat && PLACES.bowl) {   // bent right over its bowl
+        this.yaw = Math.atan2(PLACES.bowl[0] - this.x, PLACES.bowl[2] - this.z);
+        this.speed = 0; this.lookYaw = 0; this.canSee = false; this.posed = false; this.poseTimer = 0;
+        this.animate(0);
+        this.j.spine.rotation.x = 0.85; this.j.head.rotation.set(0.7, 0, 0.25);
+        this.layoutNeck();
+        this.posed = true;
+      }
       g.onEnterLair?.();
       return;
     }
@@ -445,23 +476,47 @@ export class Entity {
       if (Math.abs(this.x - this.pathStartX) > 4 && w.roomAt(this.x, this.z) === w.roomIndex('hall')) { this.hallCross++; this.lastCross = g.time; }
     }
     if (this.checking) { this.state = 'check'; this.wait = rand(3, 4.5); }
+    if (this.dockWatch) {   // Night 2: it stands over the dock for a while, as if waiting for you to come home
+      this.dockWatch = false;
+      this.watchingDock = true;
+      this.wait = rand(6, 10);
+      g.onDockWatch?.();
+    }
+  }
+
+  // Somewhere to stand over the dock, in the dock's room, in front of it.
+  dockSpot() {
+    const w = this.game.world, room = w.roomAt(DOCK.x, DOCK.z);
+    const fx = -Math.sin(DOCK.yaw), fz = -Math.cos(DOCK.yaw), base = Math.atan2(fz, fx);
+    for (let t = 0; t < 30; t++) {
+      const a = base + (Math.random() - 0.5) * Math.PI * 1.4, d = 0.8 + Math.random() * 0.9;
+      const x = DOCK.x + fx * 0.35 + Math.cos(a) * d, z = DOCK.z + fz * 0.35 + Math.sin(a) * d;
+      if (w.navFree(x, z) && w.roomAt(x, z) === room) return [x, z];
+    }
+    return null;
   }
 
   pickPatrol() {
     const g = this.game, w = g.world, r = g.roomba;
     const pr = w.roomAt(r.x, r.z), mine = w.roomAt(this.x, this.z);
     const hall = w.roomIndex('hall'), laundry = w.roomIndex('laundry');
-    const quiet = this.grace > 0 || this.calm > 0;
+    const quiet = this.grace > 0 || this.calm > 0 || this.truce > 0;
     const doorOpen = (id) => !id || w.doors[id].state === 'open';
     let p = null;
     this.checking = null;
+    this.watchingDock = false;
     this.pathStartX = this.x;
     const lairDoor = w.doors.laundry;
-    const nearLair = Math.hypot(r.x - 12.62, r.z - 5) < 3.2 || pr === laundry;
-    if (this.menace > 0.8 && lairDoor.state === 'open' && !nearLair) {
-      // It has been on you a lot: it goes back to the laundry, loudly, and shuts the door.
-      p = [12.6, 2.6];
+    const nearLair = Math.hypot(r.x - 12.62, r.z - 5) < 3.2 || pr === laundry || (PLACES.hole && Math.hypot(r.x - PLACES.hole[0], r.z - PLACES.hole[2]) < 2.2);
+    const dockChance = RULES.dockLinger ? RULES.dockLinger + (r.battery < 35 || r.bin > 70 ? 0.35 : 0) : 0;
+    if ((this.menace > 0.8 || this.hungry) && lairDoor.state === 'open' && !nearLair) {
+      // It has been on you a lot (or, Night 5, it is hungry): it goes back to the laundry, loudly, and shuts the door.
+      p = [...LAIR.retreat];
       this.retreating = true;
+    } else if (this.dockNext && !quiet) {   // told to (Night 2, time to go home): it goes and waits at the dock
+      this.dockNext = false;
+      p = this.dockSpot();
+      this.dockWatch = !!p;
     } else if (g.story.task?.room === 'hall' && this.hallCross < 3 && g.time - this.lastCross > 30 && !quiet) {
       // During the hallway task it walks the length of the hall a few times, whatever else happens.
       const far = this.x > 7 ? [1.3, 5.75] : [12.3, 5.75];
@@ -472,6 +527,10 @@ export class Entity {
     } else if (!quiet && this.sinceNear > 40 && pr >= 0) {
       p = w.randomFreeIn(pr);   // it comes looking
       if (p) g.incident('idle', `Unit stayed in ${ROOMS[pr].name}: it came looking`);
+    } else if (!quiet && Math.random() < dockChance && Math.hypot(r.x - DOCK.x, r.z - DOCK.z) > 2.5) {
+      // Night 2: it has learned where you charge. More so when your battery is low or your bin is full.
+      p = this.dockSpot();
+      this.dockWatch = !!p;
     } else {
       // It checks hiding places you keep using.
       const used = Object.entries(this.coverUse).filter(([, n]) => n >= 2).map(([i]) => w.covers[+i]);
@@ -482,7 +541,7 @@ export class Entity {
       }
       const open = (ri) => {
         const room = ROOMS[ri];
-        if (room.id === 'laundry') return false;
+        if (room.id === 'laundry') return RULES.laundryPatrol;
         if (room.id === 'kid' && !doorOpen('kid')) return false;
         if (room.id === 'master' && !doorOpen('master')) return false;
         return true;
@@ -505,7 +564,9 @@ export class Entity {
       p = target >= 0 ? w.randomFreeIn(target) : null;
     }
     this.path = p ? w.findPath(this.x, this.z, p[0], p[1]) : null;
-    if (!this.path) { this.retreating = false; this.crossing = false; }
+    if (!this.path) { this.retreating = false; this.crossing = false; this.dockWatch = false; }
+    // Nights 4 and 5: now and then it switches the light on in the room you are in.
+    if (RULES.lights && !quiet && pr >= 0 && Math.random() < 0.3) g.lightsOn?.(pr, 'it');
     if (this.retreating) g.onRetreat?.();
     this.wait = 1;
   }
@@ -679,15 +740,54 @@ export class Entity {
   restore(s) {
     this.reset();
     if (s.active) {
-      // Come back somewhere far from where the robot reboots, and wander for a while first.
-      const g = this.game, r = g.roomba;
-      const spots = [[12.75, 2.3], [1.4, 8.0], [12.9, 8.3], [9.6, 1.6]].filter(([x, z]) => g.world.navFree(x, z));
-      spots.sort((a, b) => Math.hypot(b[0] - r.x, b[1] - r.z) - Math.hypot(a[0] - r.x, a[1] - r.z));
-      const [x, z] = spots[0] || [12.62, 5.7];
+      // Come back far from where the robot reboots and from what its task needs, and leave it alone for a few
+      // seconds, so a reboot never lands next to it.
+      const [x, z] = this.rebootSpot();
       this.x = x; this.z = z; this.yaw = Math.PI;
       this.activate(10);
       this.calm = 15;
+      this.truce = 6;
       this.menace = 0.2;
     }
+  }
+
+  // Candidates: the old four spots, its lair, and a few free points in every room; never the robot's room or the
+  // task's, and it must be able to walk from there to the hall. The best is the one farthest from the nearer of
+  // the robot and the task.
+  rebootSpot() {
+    const g = this.game, w = g.world, r = g.roomba, task = g.story?.task;
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const cands = [[12.75, 2.3], [1.4, 8.0], [12.9, 8.3], [9.6, 1.6], [...LAIR.retreat]];
+    ROOMS.forEach((_, ri) => { for (let k = 0; k < 3; k++) { const p = w.randomFreeIn(ri, rnd); if (p) cands.push(p); } });
+    const mine = w.roomAt(r.x, r.z), taskRoom = task?.room ? w.roomIndex(task.room) : -1;
+    const hall = w.roomIndex('hall'), hub = hall >= 0 ? w.randomFreeIn(hall, rnd) : null;
+    const toTask = this.taskDistance(task);
+    let best = null, bestScore = -1;
+    for (const [x, z] of cands) {
+      if (!w.navFree(x, z)) continue;
+      const ri = w.roomAt(x, z);
+      if (ri === mine || (ri === taskRoom && ri >= 0)) continue;
+      const score = Math.min(Math.hypot(x - r.x, z - r.z), toTask(x, z));
+      if (score <= bestScore) continue;
+      if (hub && ri !== hall && !w.findPath(x, z, hub[0], hub[1])) continue;
+      best = [x, z]; bestScore = score;
+    }
+    return best || [12.62, 5.7];
+  }
+
+  // How far a point is from what the current task needs: the room, the prints or kibble left, the items, the dock.
+  taskDistance(task) {
+    const g = this.game, w = g.world;
+    const near = (pts) => (x, z) => pts.reduce((m, [px, pz]) => Math.min(m, Math.hypot(x - px, z - pz)), Infinity);
+    if (!task) return () => Infinity;
+    if (task.kind === 'room') {
+      const rm = ROOMS[w.roomIndex(task.room)];
+      return (x, z) => Math.hypot(Math.max(rm.x0 - x, 0, x - rm.x1), Math.max(rm.z0 - z, 0, z - rm.z1));
+    }
+    if (task.kind === 'prints') return near(g.dirt.prints.filter((p) => p.shown && p.amount > 0).map((p) => [p.x, p.z]));
+    if (task.kind === 'spill') return near(g.kibble.list.filter((p) => p.group === 'spill' && !p.taken).map((p) => [p.x, p.z]));
+    if (task.kind === 'collect') return near(g.items.list.filter((it) => it.def.task && !it.taken).map((it) => [it.def.x, it.def.z]));
+    return near([[DOCK.x, DOCK.z]]);
   }
 }

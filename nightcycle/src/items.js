@@ -5,7 +5,8 @@ import { ITEMS } from './level.js';
 import { T } from './tune.js';
 
 const LABEL = { coin: 'coin', lego: 'toy', hairtie: 'hair tie', paperclip: 'clip', note: 'paper', ring: 'jewelry', tag: 'metal', crumbs: 'food', cereal: 'food',
-  polaroid: 'photo', cap: 'plastic', drawing: 'paper', tooth: 'unknown', key: 'key', receipt: 'paper' };
+  polaroid: 'photo', cap: 'plastic', drawing: 'paper', tooth: 'unknown', key: 'key', receipt: 'paper', card: 'card', page: 'paper', collar: 'leather',
+  battery: 'battery', monitor: 'device', toothbrush: 'plastic', padlock: 'metal', car: 'toy', bulb: 'glass', screws: 'metal' };
 
 export class Items {
   constructor(game) {
@@ -30,6 +31,16 @@ export class Items {
       tooth: () => { const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.004, 0.006, 4, 8), mat({ color: 0xf0ead8, roughness: 0.3 })); m.rotation.z = Math.PI / 2; return m; },
       key: () => { const g = new THREE.Group(); g.add(box(0.04, 0.003, 0.008, gold)); const t = torus(0.009, 0.0025, gold); t.position.x = -0.026; g.add(t); const p = plane(0.035, 0.022, mat({ color: 0xe8e0c8, roughness: 0.9 })); p.position.set(-0.05, 0, 0.01); g.add(p); return g; },
       receipt: () => plane(0.05, 0.14, mat({ color: 0xf2f0ea, roughness: 0.9 })),
+      card: () => plane(0.085, 0.055, mat({ color: 0xf4f1e8, roughness: 0.6 })),
+      page: () => { const g = new THREE.Group(); const p = plane(0.12, 0.16, mat({ color: 0xe8e2cc, roughness: 0.95 })); p.rotation.y = 0.3; g.add(p); return g; },
+      battery: () => { const g = new THREE.Group(); const b = cyl(0.007, 0.05, mat({ color: 0x1e1e22, roughness: 0.4 })); b.rotation.z = Math.PI / 2; b.position.y = 0.007; const t = cyl(0.0072, 0.012, mat({ color: 0xc8962a, metalness: 0.6, roughness: 0.4 })); t.rotation.z = Math.PI / 2; t.position.set(0.02, 0.007, 0); g.add(b, t); return g; },
+      monitor: () => { const g = new THREE.Group(); g.add(box(0.06, 0.025, 0.09, mat({ color: 0xe8e8e0, roughness: 0.5 }))); const a = cyl(0.003, 0.05, mat({ color: 0x222222 })); a.rotation.z = Math.PI / 2; a.position.set(0.05, 0.02, -0.03); g.add(a); const l = box(0.008, 0.003, 0.008, mat({ color: 0x30ff60, emissive: 0x30ff60, emissiveIntensity: 1 })); l.position.set(0, 0.025, 0.03); g.add(l); return g; },
+      toothbrush: () => { const g = new THREE.Group(); g.add(box(0.15, 0.008, 0.012, mat({ color: 0x4a8ac8, roughness: 0.4 }))); const h = box(0.025, 0.012, 0.012, mat({ color: 0xeeeeee, roughness: 0.9 })); h.position.x = 0.065; g.add(h); return g; },
+      padlock: () => { const g = new THREE.Group(); g.add(box(0.04, 0.012, 0.035, silver)); const t = torus(0.014, 0.003, silver); t.rotation.x = 0; t.position.set(0, 0.003, -0.025); g.add(t); return g; },
+      car: () => { const g = new THREE.Group(); g.add(box(0.07, 0.022, 0.035, mat({ color: 0x2a5ac8, roughness: 0.3 }))); for (const [x, z] of [[-0.022, -0.02], [0.022, -0.02], [-0.022, 0.02], [0.022, 0.02]]) { const w = cyl(0.008, 0.006, mat({ color: 0x111111 })); w.rotation.x = Math.PI / 2; w.position.set(x, 0.006, z); g.add(w); } return g; },
+      bulb: () => { const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.SphereGeometry(0.012, 10, 8), mat({ color: 0xfff0d0, roughness: 0.1, transparent: true, opacity: 0.8 })); b.position.y = 0.012; g.add(b); return g; },
+      screws: () => { const g = new THREE.Group(); for (let k = 0; k < 4; k++) { const sc = cyl(0.003, 0.03, silver); sc.rotation.z = Math.PI / 2; sc.rotation.y = k * 0.8; sc.position.set((k - 1.5) * 0.02, 0.003, (k % 2) * 0.015); g.add(sc); } return g; },
+      collar: () => { const g = new THREE.Group(); const t = torus(0.03, 0.006, mat({ color: 0x8a1c18, roughness: 0.7 })); t.scale.set(1, 1, 0.6); g.add(t); const b = box(0.014, 0.004, 0.012, gold); b.position.x = 0.03; g.add(b); return g; },
     };
     this.list = ITEMS.map((def) => {
       const obj = make[def.kind]();
@@ -48,7 +59,13 @@ export class Items {
   update(dt) {
     const g = this.game, r = g.roomba;
     const canSuck = r.suction && !r.dead && r.bin < 100;
+    // Things for a pick-up task are only on the floor once that task starts, so cleaning can't do it for you.
+    const collecting = g.story?.task?.kind === 'collect';
     for (const it of this.list) {
+      if (it.def.task && !it.taken) {
+        it.obj.visible = collecting; it.tag.gone = !collecting;
+        if (!collecting) continue;
+      }
       if (it.taken) {
         if (it.anim > 0) {  // it hops, spins and is whisked in under the bumper
           it.anim = Math.max(0, it.anim - dt * 3.2);
@@ -80,11 +97,14 @@ export class Items {
     g.fx?.pickup(it.obj.position.x, it.obj.position.z, !!it.def.story, ['coin', 'ring', 'tag', 'key', 'paperclip'].includes(it.def.kind));
     this.found.push(it.def.id);
     if (it.def.text) g.hud.itemCard(it.def);
+    else if (it.def.task) { const t = this.list.filter((i) => i.def.task); g.hud.log(`Picked up: ${LABEL[it.def.kind]} (${t.filter((i) => i.taken).length}/${t.length})`); }
     else g.hud.log(`Picked up: ${LABEL[it.def.kind]}`);
     if (it.def.story) g.stats.story++;
   }
 
   get storyTotal() { return ITEMS.filter((i) => i.story).length; }
+  // A collect task: the share of tonight's task items (task: true) picked up.
+  get taskProgress() { const t = this.list.filter((i) => i.def.task); return t.length ? t.filter((i) => i.taken).length / t.length : 1; }
 
   snapshot() { return this.list.map((it) => it.taken); }
   restore(s) {

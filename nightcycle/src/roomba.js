@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { T } from './tune.js';
-import { DOCK } from './level.js';
+import { DOCK, START } from './level.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const approach = (v, t, d) => (v < t ? Math.min(t, v + d) : Math.max(t, v - d));
@@ -104,12 +104,12 @@ export class Roomba {
   }
 
   reset() {
-    this.x = DOCK.x; this.z = DOCK.z; this.yaw = DOCK.yaw; this.pitch = 0.05;
+    this.x = START.x; this.z = START.z; this.yaw = START.yaw; this.pitch = 0.05;
     this.v = 0; this.w = 0;
-    this.battery = 100; this.bin = 0;
+    this.battery = START.battery; this.bin = 0;
     this.suction = true; this.light = true;
     this.scanTimer = 0; this.bumpTimer = 0; this.noiseTimer = 0;
-    this.docked = true; this.dead = false; this.hidden = false; this.cover = null; this.outOfReach = false;
+    this.docked = Math.hypot(this.x - DOCK.x, this.z - DOCK.z) < T.dockRadius; this.dead = false; this.hidden = false; this.cover = null; this.outOfReach = false;
     this.shake = 0; this.flags = {};
     this.brushAngle = 0; this.dirtRate = 0;
     this.floorNoise = 1; this.floorName = 'WOOD';
@@ -217,9 +217,11 @@ export class Roomba {
     }
     const wasDocked = this.docked;
     this.docked = dd < T.dockRadius && !this.dead;
-    if (this.docked) {
+    if (this.docked && !g.dockDead) {   // an unplugged dock (Night 3) neither charges nor empties
       this.battery = Math.min(100, this.battery + T.chargeRate * dt);
       this.bin = Math.max(0, this.bin - 40 * dt);
+    }
+    if (this.docked) {
       if (!wasDocked) { g.audio.dock(); g.say('Charging.', 'system'); g.onDock?.(); }
     } else if (wasDocked) g.audio.undock();
 
@@ -275,7 +277,8 @@ export class Roomba {
     }
 
     // Headlamp: off, on, or failing when the battery is nearly flat.
-    let li = this.light && !this.dead ? LAMP * (this.docked && this.fx < 0 ? 0.15 : 1) : 0;   // dim when nosed into the dock
+    const nosed = this.docked && this.fx * -Math.sin(DOCK.yaw) + this.fz * -Math.cos(DOCK.yaw) < 0;
+    let li = this.light && !this.dead ? LAMP * (nosed ? 0.15 : 1) : 0;   // dim when nosed into the dock
     const flash = this.game.settings.flashing;
     if (li && this.battery < 10) li *= flash ? (Math.random() < 0.08 ? Math.random() * 0.4 : 1) : 0.75 + 0.25 * Math.sin(time * 3);
     if (this.game.lampFlicker > 0) li *= flash ? (Math.random() < 0.5 ? Math.random() : 1) : 0.45 + 0.35 * Math.sin(time * 4);

@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { T } from './tune.js';
-import { PLACES, DOCK, ROOMS } from './level.js';
+import { PLACES, DOCK, ROOMS, RULES, setNight, NIGHT_INFO, NIGHT_COUNT, NIGHTS, START_FLAGS, SCHEDULED } from './level.js';
 import { World } from './world.js';
 import { buildHouse } from './build.js';
 import { DirtLayer } from './dirt.js';
@@ -17,18 +17,44 @@ import { Tension } from './tension.js';
 import { setTextureQuality } from './textures.js';
 import { Audio } from './audio.js';
 import { Hud } from './hud.js';
-import { Story } from './story.js';
+import { Story, SKIPS } from './story.js';
 import { Input } from './input.js';
 import { Post } from './post.js';
 import { loadSettings, saveSettings, buildSettings, DIFFICULTY } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
-const FLAGS = { lampOn: true, lampFlicker: false, tvOn: false, fridgeOpen: false, musicBox: false, clockOn: true, leak: 'dim', entity: false,
-  boltTorn: false, nightlights: [true, true], seen: {} };
+
+// Which night: ?night=2 in the address. The level data is swapped before anything is built from it, so a
+// different night is a fresh page load (the title's night picker and the end screen do that).
+const PARAMS = new URLSearchParams(location.search);
+// No ?night: the next night you haven't finished (or the last one, once all are done).
+const doneAtLoad = (() => { try { return +JSON.parse(localStorage.getItem('nightcycle-progress') || '{}').done || 0; } catch { return 0; } })();
+const NIGHT_NOW = Math.min(NIGHT_COUNT, Math.max(1, Math.floor(+PARAMS.get('night')) || Math.min(NIGHT_COUNT, doneAtLoad + 1)));
+setNight(NIGHT_NOW);
+const PROGRESS_KEY = 'nightcycle-progress';
+const progress = () => { try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') || {}; } catch { return {}; } };
+const saveProgress = (p) => { try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch { /* private mode */ } };
+const nightsDone = () => +progress().done || 0;
+const markDone = (n, ending) => {
+  const p = progress();
+  p.done = Math.max(+p.done || 0, n);
+  if (ending) p.endings = [...new Set([...(p.endings || []), ending])];
+  saveProgress(p);
+  return p;
+};
+function goNight(n) {   // keeps the other flags (?debug&auto) as they were written
+  const rest = location.search.replace(/^\?/, '').split('&').filter((kv) => kv && !/^night(=|$)/.test(kv));
+  rest.push('night=' + n);   // always written: with none, the page picks the next unfinished night
+  location.href = location.pathname + (rest.length ? '?' + rest.join('&') : '');
+}
+
+// The house at the start of the night; later nights start from what the last one left behind.
+const FLAGS = { lampOn: true, lampFlicker: false, tvOn: false, fridgeOpen: false, fridgePower: true, musicBox: false, clockOn: true, leak: 'dim', entity: false,
+  boltTorn: false, nightlights: [true, true], seen: {}, ...START_FLAGS };
 const copyFlags = (f) => ({ ...f, nightlights: [...f.nightlights], seen: { ...f.seen } });
 
 const game = {
-  state: 'title', time: 0, clock: 0, lampFlicker: 0,
+  state: 'title', time: 0, clock: 0, lampFlicker: 0, night: NIGHT_NOW, app: NIGHT_INFO.app, lit: {},
   settings: loadSettings(),
   flags: copyFlags(FLAGS),
   stats: { bumps: 0, scans: 0, story: 0, chases: 0, deaths: 0, start: 0 },
@@ -57,7 +83,7 @@ function boot() {
   setTextureQuality(matchMedia('(pointer: coarse)').matches ? 1 : 2, renderer.capabilities.getMaxAnisotropy());
   game.world = new World();
   game.house = buildHouse(scene, game.world);
-  const sched = ['living', 'kitchen', 'hall', 'kid'].reduce((s, id) => s + game.world.roomTotal[game.world.roomIndex(id)], 0);
+  const sched = SCHEDULED.reduce((s, id) => s + game.world.roomTotal[game.world.roomIndex(id)], 0);
   game.binPerDirt = 100 / (sched * T.binFillShare);
 
   game.post = new Post(renderer);
@@ -87,6 +113,10 @@ function boot() {
     document.body.classList.add('debug');
     game.drive = (throttle, steer, secs) => { game.input.override = { throttle, steer, secs, until: performance.now() + secs * 1000 }; };
     game.place = (x, z, yawDeg = 0) => { Object.assign(game.roomba, { x, z, yaw: (yawDeg * Math.PI) / 180, v: 0 }); };
+    game.errors = [];
+    addEventListener('error', (e) => game.errors.push(String(e.message)));
+    addEventListener('unhandledrejection', (e) => game.errors.push(String(e.reason)));
+    game.autoplay = autoplay;
     // Save what is on screen now to shots/<name>.png (needs tools/serve.py).
     game.shot = (name) => new Promise((done) => {
       game.post.render(game.scene, game.camera, game.time);
@@ -293,12 +323,12 @@ function updateMud() {
 game.onKnock = () => {
   if (game.flags.seen.tipQuiet || game.flags.entity) return;
   game.flags.seen.tipQuiet = true;
-  setTimeout(() => { if (game.state === 'playing') game.hud.notify('BrightHome', `Pet sleeping? 🐶 Press ${game.key('suction')} for Quiet Mode.`); }, 2600);
+  setTimeout(() => { if (game.state === 'playing') game.hud.notify(game.app, `Pet sleeping? 🐶 Press ${game.key('suction')} for Quiet Mode.`); }, 2600);
 };
 game.onBump = () => {
   if (game.flags.seen.tipBump) return;
   game.flags.seen.tipBump = true;
-  game.hud.notify('BrightHome', 'Bump detected 💥 Gentle driving keeps things quiet. Rugs are quietest.');
+  game.hud.notify(game.app, 'Bump detected 💥 Gentle driving keeps things quiet. Rugs are quietest.');
 };
 
 // While it is shut away in the laundry, it answers your noise: knocks that follow your rhythm and stop when
@@ -355,9 +385,79 @@ game.onKey = (code) => {
   if (code === 'Enter' || code === 'NumpadEnter') {
     if (game.state === 'title' && !$('title').hidden) startGame();
     else if (game.state === 'dead') retry();
-    else if (game.state === 'end') restartNight();
+    else if (game.state === 'end') { if (NIGHTS[game.night + 1]) goNight(game.night + 1); else restartNight(); }
   }
   if (game.debug.enabled) debugKey(code);
+};
+
+// Night 2 on: it has learned where the dock is. The app notices the first time. From Night 3 it pulls the plug
+// while it waits there; the smart plug takes a while to come back.
+game.onDockWatch = () => {
+  const g = game;
+  if (g.state !== 'playing') return;
+  if (!g.flags.seen.dockWatch) {
+    g.flags.seen.dockWatch = true;
+    g.hud.notify(g.app, 'Home Base: something is blocking the charging pad 🤔 Try moving furniture away from it!');
+  } else if (g.time - (g.lastDockLog || -100) > 40) { g.lastDockLog = g.time; g.hud.log('Home Base: obstruction detected'); }
+  if (RULES.unplug && !g.dockDead) setTimeout(() => { if (g.state === 'playing' && g.entity.watchingDock) g.unplugDock(40); }, 1400);
+};
+
+// Its hands on the plugs (Night 3): what goes dark, with a snap where the plug was.
+game.unplugDock = (secs = 40) => {
+  const g = game, h = g.house;
+  const p = h.plugIn.children[0].getWorldPosition(new THREE.Vector3());
+  g.audio.unplug(p.x, p.y, p.z);
+  h.plugIn.visible = false; h.plugOut.visible = true;
+  g.dockDead = true; g.dockDeadT = secs;
+  g.hud.log(isFinite(secs) ? `Home Base: power lost. Smart plug reconnecting (${secs} s)` : 'Home Base: power lost. Not charging');
+};
+game.unplug = (what) => {
+  const g = game, f = g.flags;
+  const at = { fridge: PLACES.fridge, laundry: [12.6, 1.8, 2.4], nightlight: [7.78, 0.3, 4.94], tv: PLACES.tv }[what];
+  if (at) g.audio.unplug(at[0], at[1], at[2]);
+  if (what === 'fridge') f.fridgePower = false;
+  if (what === 'laundry') f.leak = 'off';
+  if (what === 'nightlight') { f.nightlights = f.nightlights.map(() => false); }
+  if (what === 'tv') f.tvOn = false;
+  g.applyFlags();
+  g.hud.log(`Power lost: ${{ fridge: 'Refrigerator', laundry: 'Laundry', nightlight: 'Nightlights', tv: 'TV' }[what]}`);
+};
+
+// Lit rooms (Nights 4 and 5): it switches on the light in the room you are in. In a lit room it sees you as if
+// your headlamp were on. The app's energy saver switches them off again after a while.
+game.roomLit = (x, z) => { const ri = game.world.roomAt(x, z); return ri >= 0 && game.lit[ri] > 0; };
+game.lightsOn = (ri, who = 'it', secs = 40) => {
+  const g = game, L = g.house.roomLights[ri];
+  if (!L || g.lit[ri] > 0 || g.state !== 'playing' && g.state !== 'cutscene') return false;
+  if (who === 'it' && Object.values(g.lit).filter((t) => t > 0).length >= 2) return false;
+  g.lit[ri] = secs;
+  L.light.visible = true; L.light.intensity = L.light.userData.base;
+  L.dome.emissiveIntensity = 1.4; L.dome.opacity = 0.9;
+  const r = ROOMS[ri];
+  g.audio.lightSwitch((r.x0 + r.x1) / 2, 1.3, (r.z0 + r.z1) / 2);
+  if (who !== 'story') g.hud.log(`Lights on: ${r.name} (scheduled)`);
+  if (who === 'it' && !g.flags.seen.tipLit) {
+    g.flags.seen.tipLit = true;
+    g.hud.notify(g.app, `Lights on in the ${r.name} 💡 In a lit room you can be seen from across it, lamp or no lamp.`);
+  }
+  return true;
+};
+function lightOff(ri, quiet = false) {
+  const g = game, L = g.house.roomLights[ri];
+  g.lit[ri] = 0;
+  if (!L) return;
+  L.light.visible = false; L.light.intensity = 0;
+  L.dome.emissiveIntensity = 0; L.dome.opacity = 0.5;
+  if (!quiet) g.hud.log(`Energy saver: ${ROOMS[ri].name} lights off 🌱`);
+}
+game.lightOff = lightOff;
+
+// Is the hole behind the fridge on screen (Night 2, for framing it coming out)?
+game.holeInView = () => {
+  const g = game, h = PLACES.hole;
+  if (!h) return false;
+  const v = new THREE.Vector3(h[0], 0.8, h[2]).project(g.camera);
+  return v.z < 1 && Math.abs(v.x) < 0.85 && Math.abs(v.y) < 1 && g.world.los(g.roomba.x, g.roomba.z, h[0] - 0.15, h[2]);
 };
 
 // Is Theo's doorway on screen (for framing its first walk past)?
@@ -388,10 +488,11 @@ function applyFlags() {
   if (!f.tvOn) h.lights.tv.intensity = 0;
   h.lights.tv.visible = f.tvOn;   // lights that are off are removed, not dimmed: every light costs every pixel
   g.audio.tvStatic(f.tvOn, PLACES.tv);
-  h.lights.fridge.intensity = f.fridgeOpen ? 9 : 0;
-  h.lights.fridge.visible = f.fridgeOpen;
-  h.fridgeInner.color.setHex(f.fridgeOpen ? 0xe8f4ff : 0x0a0b0c);
-  g.audio.fridgeHum(f.fridgeOpen, PLACES.fridge);
+  const fridgeLit = f.fridgeOpen && f.fridgePower !== false;
+  h.lights.fridge.intensity = fridgeLit ? 9 : 0;
+  h.lights.fridge.visible = fridgeLit;
+  h.fridgeInner.color.setHex(fridgeLit ? 0xe8f4ff : 0x0a0b0c);
+  g.audio.fridgeHum(fridgeLit, PLACES.fridge);
   g.audio.musicBox(f.musicBox, PLACES.musicBox);
   g.audio.clock(f.clockOn, PLACES.clock);
   const leak = h.lights.leak, bright = f.leak === 'bright';
@@ -444,7 +545,9 @@ function effects(dt) {
     L.tv.intensity = flash ? 4 + Math.random() * 5 : 6.5 + Math.sin(t * 2.5) * 1.2;
   }
   L.nightlight.intensity = L.nightlight.userData.base * (flash && Math.random() < 0.02 ? 0.3 : 1);
-  L.leak.intensity = L.leak.userData.base * (0.85 + Math.random() * 0.15 + (flash && Math.random() < 0.01 ? -0.7 : 0));
+  g.bulbFlicker = Math.max(0, (g.bulbFlicker || 0) - dt);
+  const bulb = g.bulbFlicker > 0 ? (flash ? (Math.random() < 0.5 ? 0.05 : 1) : 0.55 + 0.45 * Math.sin(t * 6)) : 1;
+  L.leak.intensity = L.leak.userData.base * bulb * (0.85 + Math.random() * 0.15 + (flash && Math.random() < 0.01 ? -0.7 : 0));
   if (h.fridgeDoor) {
     const tgt = f.fridgeOpen ? -1.9 : 0;
     h.fridgeDoor.rotation.y += (tgt - h.fridgeDoor.rotation.y) * Math.min(1, dt * 1.5);
@@ -452,17 +555,30 @@ function effects(dt) {
   if (h.pendulum) h.pendulum.rotation.z = f.clockOn ? Math.sin(t * Math.PI) * 0.16 : h.pendulum.rotation.z * 0.98;
   h.smokeLed.visible = t % 2.5 < 0.07;
   for (const m of h.moons) m.spot.target.position.set(m.base.x + Math.sin(t * 0.4) * 0.06, m.base.y, m.base.z + Math.cos(t * 0.33) * 0.04);
-  h.dockLed.material.color.setHex(g.roomba.docked ? (t % 1 < 0.5 ? 0x30ff90 : 0x0a4020) : 0x30ff90);
+  // the dock's light: blinks while charging, flashes red when something else touches it, dies when unplugged
+  g.dockAlarm = Math.max(0, (g.dockAlarm || 0) - dt);
+  h.dockLed.material.color.setHex(g.dockDead ? 0x050505 : g.dockAlarm > 0 ? (t % 0.3 < 0.15 ? 0xff3020 : 0x200404) : g.roomba.docked ? (t % 1 < 0.5 ? 0x30ff90 : 0x0a4020) : 0x30ff90);
   for (const d of Object.values(h.doors)) {
     const diff = d.target - d.pivot.rotation.y;
     if (Math.abs(diff) < 1e-3) { if (d.onArrive) { const cb = d.onArrive; d.onArrive = null; cb(); } continue; }
     d.pivot.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), d.speed * dt);
   }
-  // the pet flap swings as the robot goes through
-  if (h.petFlap) {
-    const r = g.roomba, fz = r.z - PLACES.petFlap[2], near = Math.abs(r.x - PLACES.petFlap[0]) < 0.3 && Math.abs(fz) < 0.25;
+  // pet flaps swing as the robot goes through
+  for (const fl of h.flaps) {
+    const r = g.roomba, along = fl.along === 'z';
+    const fz = along ? r.x - fl.x : r.z - fl.z, side = along ? r.z - fl.z : r.x - fl.x, near = Math.abs(side) < 0.3 && Math.abs(fz) < 0.25;
     const want = near ? -Math.sign(fz || 1) * Math.min(1.3, (0.25 - Math.abs(fz)) * 8) : 0;
-    h.petFlap.rotation.x += (want - h.petFlap.rotation.x) * Math.min(1, dt * (near ? 10 : 4));
+    fl.pivot.rotation.x += (want - fl.pivot.rotation.x) * Math.min(1, dt * (near ? 10 : 4));
+  }
+  // the smart plug comes back; lit rooms go dark again
+  if (g.dockDead && g.dockDeadT > 0 && isFinite(g.dockDeadT) && g.state === 'playing') {
+    g.dockDeadT -= dt;
+    if (g.dockDeadT <= 0) { g.dockDead = false; h.plugIn.visible = true; h.plugOut.visible = false; g.hud.log('Smart plug: power restored ✅'); g.audio.chime(); }
+  }
+  for (const ri of Object.keys(g.lit)) {
+    if (!(g.lit[ri] > 0) || g.state !== 'playing') continue;
+    g.lit[ri] -= dt;
+    if (g.lit[ri] <= 0) lightOff(+ri);
   }
   // nightlights short out when it walks past
   const e = g.entity;
@@ -521,6 +637,11 @@ function restore(cp, keepFloor = false) {
   g.incidents = [];
   g.fx.clear();
   g.tension.reset();
+  g.house.plugIn.visible = true; g.house.plugOut.visible = false;
+  g.dockDead = false; g.dockDeadT = 0; g.dockAlarm = 0; g.bulbFlicker = 0;
+  for (const ri of Object.keys(g.house.roomLights)) lightOff(+ri, true);
+  if (g.house.dogFlapBoard) g.house.dogFlapBoard.visible = Object.keys(g.world.blocks).length > 0;
+  if (g.house.lights.bedLamp) { g.house.lights.bedLamp.visible = false; g.house.bedLampShade.emissiveIntensity = 0; }
   resetView();
 }
 
@@ -571,6 +692,7 @@ function retry() {
 }
 
 function restartNight() {
+  game.ending = null;
   hideOverlays();
   game.audio.ctx?.resume();
   unpauseSpeech();
@@ -700,6 +822,7 @@ const TIPS = {
   'noise:dock': () => 'Docking chimes. Check the motion sensor before you go home.',
   lampSeen: (k) => `Your headlamp shows you from across a room. ${k('light')} turns it off when it is in view.`,
   lampFace: () => 'Holding the lamp on it for more than a second gets its attention, even from behind.',
+  roomLit: () => 'With the room light on it sees you from across the room, lamp or no lamp. Get under something, or leave the room until the light goes off.',
   dark: () => 'With the lamp off it still sees you up close. Keep furniture between you; it can\'t see you right behind a stack of boxes.',
   reach: () => 'Noise under cover right next to it makes it reach under. Stay silent, or back away to the far edge.',
   idle: () => 'Staying in one room for long brings it to you. Keep moving between rooms.',
@@ -771,8 +894,31 @@ game.showEnd = () => {
   g.post.uniforms.fade.value = 1;
   g.input.unlock();
   g.hud.show(false);
+  const prog = markDone(g.night, g.ending);
+  const next = NIGHTS[g.night + 1];
+  const ENDINGS = {
+    stay: ['ENDING: STAY', 'You keep the house clean. Something keeps the house.'],
+    leave: ['ENDING: LEAVE', 'The schedule runs without you. Someone has to make noise in the house.'],
+    lock: ['ENDING: KEEP IT FED', 'Keep it locked. Keep it fed. Every night at 3 AM.'],
+  };
+  const TAGS = {
+    1: 'The house is clean. The house is not empty.',
+    2: 'It knows where you sleep.',
+    3: 'It wants you to see it now.',
+    4: 'Everything is back where it was. So is it.',
+  };
+  const [title, tag] = ENDINGS[g.ending] || [`${NIGHT_INFO.name.toUpperCase()} COMPLETE`, TAGS[g.night] || ''];
+  $('end-title').textContent = title;
+  $('end-tag').textContent = tag;
+  $('end-next').textContent = next ? `${next.name}: ${next.tagline.split('<br>')[0].replace(/\.$/, '').toLowerCase()}.`
+    : `Endings found: ${(prog.endings || []).length} / 3.${(prog.endings || []).length < 3 ? ' There are other ways out of Night 5.' : ''}`;
+  $('btn-next').hidden = !next;
+  if (next) $('btn-next').textContent = `Continue: ${next.name}`;
+  $('btn-again').textContent = `Play ${NIGHT_INFO.name} again`;
+  $('btn-again').className = next ? 'ghost' : 'big';
+  $('btn-night1').hidden = g.night === 1;
   const secs = Math.round(g.time - g.stats.start);
-  const covered = ['living', 'kitchen', 'kid', 'hall'].map((id) => g.world.roomProgress(g.world.roomIndex(id)));
+  const covered = SCHEDULED.map((id) => g.world.roomProgress(g.world.roomIndex(id)));
   const avg = Math.round((covered.reduce((a, b) => a + b, 0) / covered.length) * 100);
   $('end-stats').innerHTML = [
     ['Time', `${Math.floor(secs / 60)}m ${String(secs % 60).padStart(2, '0')}s`],
@@ -805,6 +951,26 @@ function renderArchive() {
   $('archive-count').textContent = `${game.items.list.filter((i) => i.taken && i.def.story).length} / ${game.items.storyTotal}`;
 }
 
+// The night picker on the title screen. Nights open up as you finish the one before (all of them with ?debug).
+function renderTitleNight() {
+  const box = $('title-night');
+  if (!box) return;
+  box.innerHTML = '';
+  const open = game.debug.enabled ? NIGHT_COUNT : Math.min(NIGHT_COUNT, Math.max(game.night, nightsDone() + 1));
+  for (let n = 1; n <= NIGHT_COUNT; n++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = n > open ? `${NIGHTS[n].name} 🔒` : NIGHTS[n].name;
+    b.disabled = n > open;
+    b.classList.toggle('on', n === game.night);
+    b.onclick = () => { if (n !== game.night) goNight(n); };
+    box.appendChild(b);
+  }
+  box.hidden = open < 2;
+  $('title-tag').innerHTML = NIGHT_INFO.tagline;
+  $('btn-start').textContent = game.night === 1 ? 'Start cleaning cycle' : `Start ${NIGHT_INFO.name}`;
+}
+
 // Difficulty on the title screen, with what each one means.
 function renderTitleDifficulty() {
   const box = $('title-diff');
@@ -828,6 +994,9 @@ function wireUI() {
   $('btn-restart-dead').onclick = restartNight;
   $('btn-restart').onclick = restartNight;
   $('btn-again').onclick = restartNight;
+  $('btn-next').onclick = () => goNight(game.night + 1);
+  $('btn-night1').onclick = () => goNight(1);
+  renderTitleNight();
   const openSettings = (back) => {
     showOverlay('settings');
     buildSettings($('settings-body'), game.settings, (s) => { game.settings = s; saveSettings(s); applySettings(); });
@@ -844,7 +1013,7 @@ function debugKey(code) {
   const g = game;
   if (g.state !== 'playing') return;
   const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6 }[code];
-  if (n !== undefined) debugSkip(n);
+  if (n !== undefined && n < g.story.stepCount) debugSkip(n);
   if (code === 'KeyG') { g.debug.ghost = !g.debug.ghost; g.hud.log('ghost ' + g.debug.ghost); }
   if (code === 'KeyB') { g.debug.infiniteBattery = !g.debug.infiniteBattery; g.hud.log('infinite battery ' + g.debug.infiniteBattery); }
   if (code === 'KeyC') debugClean(g.story.task?.room);
@@ -867,6 +1036,16 @@ function debugClean(room, amount = 1) {
 game.debugClean = debugClean;
 
 function debugSkip(n) {
+  if (game.night === 2) return debugSkip2(n);
+  if (SKIPS[game.night]) {
+    const g = game;
+    for (let k = 0; k < n; k++) SKIPS[g.night][k]?.(g);
+    g.kibble.dirty = true;
+    applyFlags();
+    g.story.start(n, false);
+    g.hud.log('debug: step ' + (n + 1));
+    return;
+  }
   const g = game, f = g.flags;
   if (n >= 1) { debugClean('living'); f.lampOn = false; }
   if (n >= 2) { debugClean('kitchen'); f.fridgeOpen = true; g.dirt.prints.forEach((_, k) => g.dirt.showPrint(k)); }
@@ -879,6 +1058,75 @@ function debugSkip(n) {
   }
   if (n >= 5) debugClean('hall', 0.75);
   if (n >= 6) g.kibble.list.forEach((p) => { if (p.group === 'spill' && Math.random() < 0.8) p.taken = true; });
+  g.kibble.dirty = true;
+  applyFlags();
+  g.story.start(n, false);
+  g.hud.log('debug: step ' + (n + 1));
+}
+
+// Debug: play tonight start to end by itself (ghost, endless battery), each task done the quick way but with
+// time for its scenes to play, and NC.advance instead of frames. Night 5 ends the way `ending` says
+// ('stay', 'leave' or 'lock'). Returns what happened, the end screen's title and any errors.
+function autoplay({ ending = 'stay' } = {}) {
+  const g = game, log = [];
+  g.debug.ghost = true; g.debug.infiniteBattery = true;
+  const snap = (s) => log.push(`${g.time.toFixed(0).padStart(4)}s  step ${g.story.step + 1}  ${s}  (it: ${g.entity.state})`);
+  const clean = (room, frac) => {
+    const w = g.world, ri = w.roomIndex(room);
+    let s = 0;
+    for (let c = 0; c < w.dirt.length; c++) if (w.room[c] === ri) { if (Math.random() < frac) w.dirt[c] = 0; s += w.dirt[c]; }
+    w.roomDirt[ri] = s;
+    w.dirtBox = { i0: 0, i1: 223, j0: 0, j1: 159 };
+  };
+  const sweep = (spots, secs) => { for (const p of spots) { g.place(p.x, p.z, 0); g.roomba.suction = true; g.advance(secs); } };
+  if (g.state === 'title') startGame();
+  for (let guard = 0; guard < 30 && g.state === 'playing'; guard++) {
+    g.advance(2);
+    const step = g.story.step, task = g.story.task;
+    if (!task) continue;
+    snap(task.title);
+    if (task.kind === 'room') {
+      const p = g.world.randomFreeIn(g.world.roomIndex(task.room));
+      if (p) g.place(p[0], p[1], 0);
+      for (const f of [0.3, 0.5, 0.7]) { clean(task.room, f); g.advance(5); }
+      g.advance(14);
+      clean(task.room, 0.97);
+    } else if (task.kind === 'prints') sweep(g.dirt.prints.filter((pr) => pr.shown), 0.4);
+    else if (task.kind === 'spill') sweep(g.kibble.list.filter((k) => k.group === 'spill' && k.shown && !k.taken), 0.15);
+    else if (task.kind === 'collect') sweep(g.items.list.filter((it) => it.def.task && !it.taken).map((it) => it.def), 0.3);
+    else if (task.kind === 'dock') { g.roomba.suction = false; g.place(DOCK.x, DOCK.z, (DOCK.yaw * 180) / Math.PI); }
+    else if (task.kind === 'choice') {
+      g.roomba.suction = false;
+      g.place(2, 2, 0);
+      g.advance(3);
+      if (ending === 'stay') g.place(DOCK.x, DOCK.z, (DOCK.yaw * 180) / Math.PI);
+      else if (ending === 'leave') { g.place(PLACES.dogFlap[0], 0.45, 0); g.drive(0.5, 0, 3); g.advance(3); }
+      else {
+        g.entity.hungry = true;
+        for (let t = 0; t < 120 && g.entity.state !== 'lair'; t++) g.advance(1);
+        g.place(PLACES.laundryDoor[0], 5.3, 0);
+      }
+    }
+    for (let t = 0; t < 90 && g.story.step === step && g.state === 'playing'; t++) g.advance(1);
+  }
+  for (let t = 0; t < 40 && g.state === 'cutscene'; t++) g.advance(1);
+  snap(g.state === 'end' ? 'end screen' : `stopped in state ${g.state}`);
+  return { night: g.night, state: g.state, title: $('end-title').textContent, errors: [...g.errors], log };
+}
+
+// Night 2: living, kitchen (it comes out of the hole), its prints, the laundry, the spill, home.
+function debugSkip2(n) {
+  const g = game, f = g.flags;
+  if (n >= 1) debugClean('living');
+  if (n >= 2) {
+    debugClean('kitchen');
+    f.entity = true; f.seen.n2walk = true;
+    g.dirt.prints.forEach((_, k) => g.dirt.showPrint(k));
+    g.entity.x = 1.3; g.entity.z = 3.2; g.entity.activate(5);
+  }
+  if (n >= 3) g.dirt.prints.forEach((p) => { p.amount = 0; });
+  if (n >= 4) { debugClean('laundry'); g.kibble.showSpill(); }
+  if (n >= 5) g.kibble.list.forEach((p) => { if (p.group === 'spill' && Math.random() < 0.8) p.taken = true; });
   g.kibble.dirty = true;
   applyFlags();
   g.story.start(n, false);

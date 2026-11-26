@@ -286,7 +286,7 @@ export class Tension {
     const r = g.roomba;
     const ahead = (s) => { const a = Math.atan2(-(s.x - o.x) * r.fz + (s.z - o.z) * r.fx, (s.x - o.x) * r.fx + (s.z - o.z) * r.fz); return Math.abs(a); };
     const spots = GHOST_SPOTS.map(([x, z]) => ({ x, z, d: Math.hypot(x - o.x, z - o.z) }))
-      .filter((s) => s.d > 3.2 && s.d < 9 && w.los(o.x, o.z, s.x, s.z))
+      .filter((s) => s.d > 3.2 && s.d < 9 && w.navFree(s.x, s.z) && w.los(o.x, o.z, s.x, s.z))
       .sort((a, b) => (ahead(a) < 0.9 ? 0 : 10) - (ahead(b) < 0.9 ? 0 : 10) || Math.abs(a.d - 5.5) - Math.abs(b.d - 5.5));   // in view first, then about five metres off
     if (!spots.length) return null;
     this.ghostReady = false; this.ghostUsed = true;

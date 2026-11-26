@@ -871,6 +871,50 @@ function drawingPaper(seed) {
   return tex(c, { repeat: false });
 }
 
+// The rim of a hole torn right through a wall (Night 2): torn wallpaper and broken plasterboard round an
+// opening that is left transparent. W x H metres, the opening ow x oh standing on the bottom edge, centred.
+function holeRim(seed, W, H, ow, oh) {
+  const r = rng(seed), P = 200, cw = Math.round(W * P), ch = Math.round(H * P);
+  const [c, g] = canvas(cw, ch);
+  const ox0 = (cw - ow * P) / 2, ox1 = ox0 + ow * P, oy0 = ch - oh * P;
+  // a jagged outline round the opening, `out` px outside it on average
+  const outline = (out, jag) => {
+    const pts = [];
+    const run = (ax, ay, bx, by, nx, ny) => {
+      const n = Math.ceil(Math.hypot(bx - ax, by - ay) / 9);
+      for (let k = 0; k < n; k++) { const t = k / n, d = out * (0.35 + r() * jag); pts.push([ax + (bx - ax) * t + nx * d, ay + (by - ay) * t + ny * d]); }
+    };
+    run(ox0, ch + 4, ox0, oy0, -1, 0);
+    run(ox0, oy0, ox1, oy0, 0, -1);
+    run(ox1, oy0, ox1, ch + 4, 1, 0);
+    pts.push([ox1 + out, ch + 4], [ox0 - out, ch + 4]);
+    g.beginPath();
+    pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.closePath();
+  };
+  // dark drags down the wall from the top corners, where it grips coming through
+  g.filter = 'blur(6px)';
+  for (let i = 0; i < 9; i++) {
+    const side = i % 2 ? 1 : -1, x = side > 0 ? ox1 + 10 + r() * 40 : ox0 - 10 - r() * 40;
+    g.strokeStyle = `rgba(28,20,14,${0.2 + r() * 0.3})`; g.lineWidth = 8 + r() * 14;
+    g.beginPath(); g.moveTo(x, oy0 - 30 - r() * 40); g.lineTo(x + side * (r() * 20), oy0 + 60 + r() * 140); g.stroke();
+  }
+  g.filter = 'none';
+  g.fillStyle = '#b8b0a0'; outline(30, 1.3); g.fill();   // torn paper face
+  g.fillStyle = '#d4cdbd'; outline(12, 1.2); g.fill();   // the gypsum core, broken
+  g.fillStyle = '#8f8878'; outline(5, 1.0); g.fill();    // its dirty cut edge
+  // claw rakes leading in at the top
+  g.strokeStyle = 'rgba(15,10,8,0.65)'; g.lineCap = 'round';
+  for (let k = 0; k < 4; k++) {
+    const x0 = ox0 + 20 + k * 9;
+    g.lineWidth = 2.4; g.beginPath(); g.moveTo(x0 - 20, oy0 - 70); g.quadraticCurveTo(x0, oy0 - 40, x0 + 10, oy0 - 6); g.stroke();
+  }
+  g.globalCompositeOperation = 'destination-out';   // the opening itself shows whatever is behind
+  g.fillRect(ox0, oy0, ox1 - ox0, ch - oy0 + 1);
+  g.globalCompositeOperation = 'source-over';
+  return tex(c, { repeat: false });
+}
+
 export function makeTextures() {
   const T = {
     floor: {
@@ -890,6 +934,7 @@ export function makeTextures() {
   T.rug = (color, round) => (T.rugs[color + round] ||= rug(color.length + (round ? 7 : 3), color, round));
   T.runner = (color) => (T.runners[color] ||= runner(41, color));
   T.label = (text) => (T.labels[text] ||= boxLabel(text, text.length * 13));
+  T.holeRim = (W, H, ow, oh) => holeRim(33, W, H, ow, oh);
   return T;
 }
 

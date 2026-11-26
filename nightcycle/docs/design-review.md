@@ -1,8 +1,10 @@
 # Night Cycle: design review (Night 1 slice)
 
-> **Status (2026-11-25): built.** Everything below is in the game except Night 2, which is a direction for the
-> next night. Deviations: the crayon under Theo's bed is on the wall under the bed at robot height (on the slats
-> the headlamp washed it out); the nightlights are fake glows, not real lights (every light costs every pixel);
+> The review of all five nights (measured play-throughs, bugs, level by level) is `design-review-nights.md`.
+
+> **Status (2026-11-25): built.** Everything below is in the game. Night 2 was built on 2026-11-26 (see
+> "Night 2 beats" in `design.md`). Deviations: the crayon under Theo's bed is on the wall under the bed at robot
+> height (on the slats the headlamp washed it out); the nightlights are fake glows, not real lights (every light costs every pixel);
 > the bench is at x 10.5-11.7 and the pet flap at x 13.45-13.9 as proposed; the console is gone and the side
 > table at the dead end is removed. Hall box stacks are at x 2.3 and x 8.45 on the south wall.
 

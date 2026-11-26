@@ -1,7 +1,7 @@
 // The house as rules: walls, doors, collision, sight lines, the entity's walking grid and the dirt.
 // No three.js and no DOM, so tools/check.mjs can run it in Node.
 
-import { HOUSE, ROOMS, WALLS, DOORS, FTYPES, FURNITURE, FOOTPRINT_PATH, DOCK, NOOKS } from './level.js';
+import { HOUSE, ROOMS, WALLS, DOORS, FTYPES, FURNITURE, FOOTPRINT_PATH, DOCK, NOOKS, GRIME, BLOCKS } from './level.js';
 import { T } from './tune.js';
 
 export const CELL = 1 / 16;                       // dirt cell
@@ -89,6 +89,9 @@ export class World {
     this.lowBlocks = [];  // furniture short enough to see over from 2.4 m, tall enough to hide a robot behind it
     this.rugs = [];
     this.links = [];      // openings the thing can walk through: which two rooms, and the door if any
+    this.holes = [];      // openings torn in a wall (Night 2): ragged edges, no frame
+    this.flaps = [];      // pet flaps: low openings a robot fits through and it doesn't
+    this.blocks = { ...BLOCKS };   // solids the story can take away (the plywood over the dog door)
     this.rooms = ROOMS;
     this.buildWalls();
     this.buildFurniture();
@@ -133,12 +136,14 @@ export class World {
           this.windows.push({ along: w.along, at: w.at, from: o.from, to: o.to, sill: o.sill, top: o.top, moon: !!o.moon });
         } else if (o.kind === 'flap') {
           piece(o.from, o.to, o.top, H, 'flap');   // too low for it: blocks its walking grid and its sight
-          this.flap = { along: w.along, at: w.at, from: o.from, to: o.to, top: o.top };
+          this.flaps.push({ along: w.along, at: w.at, from: o.from, to: o.to, top: o.top, outside: !!o.outside });
+          this.flap ||= this.flaps[0];
         } else {
           const top = o.top ?? HOUSE.doorTop;
           piece(o.from, o.to, top, H, 'lintel');
           this.lintels.push(this.pieces[this.pieces.length - 1]);
           if (o.kind === 'door') this.addDoor(o.door, w, o, top);
+          if (o.kind === 'hole') this.holes.push({ along: w.along, at: w.at, from: o.from, to: o.to, top });
           const c = (o.from + o.to) / 2, n = 0.3;
           const [ax, az, bx, bz] = w.along === 'x' ? [c, w.at - n, c, w.at + n] : [w.at - n, c, w.at + n, c];
           this.links.push({ a: this.roomAt(ax, az), b: this.roomAt(bx, bz), door: o.door || null, x: w.along === 'x' ? c : w.at, z: w.along === 'x' ? w.at : c });
@@ -204,8 +209,14 @@ export class World {
     this.refreshDoors();
   }
 
+  // A story-controlled solid: a rect, or null to take it away.
+  setBlock(id, rect) {
+    if (rect) this.blocks[id] = rect; else delete this.blocks[id];
+    this.refreshDoors();
+  }
+
   refreshDoors() {
-    this.doorBlocks = Object.values(this.doors).map((d) => this.doorRect(d));
+    this.doorBlocks = [...Object.values(this.doors).map((d) => this.doorRect(d)), ...Object.values(this.blocks)];
     this.buildNav();
   }
 
@@ -527,6 +538,7 @@ export class World {
       if (near[c]) v += 0.28;
       if (this.coverAt(x, z)) v += 0.35;
       v = smooth(0.3, 0.8, v) * (0.65 + 0.35 * fbm(x * 9, z * 9, 3));
+      v = this.grime(x, z, v);
       if (v < 0.06) v = 0;
       this.dirt[c] = v;
       this.dirt0[c] = v;
@@ -536,6 +548,21 @@ export class World {
     this.dirtBox = null;
     this.cleanDisc = disc;
     this.cleanable = cleanable;
+  }
+
+  // Tonight's extra dirt on top of the noise: where furniture stood or was dragged, plaster dust by a hole.
+  grime(x, z, v) {
+    for (const g of GRIME) {
+      let inside;
+      if (g.rect) inside = x > g.rect.x0 && x < g.rect.x1 && z > g.rect.z0 && z < g.rect.z1;
+      else {
+        const [[ax, az], [bx, bz]] = g.seg, dx = bx - ax, dz = bz - az;
+        const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
+        inside = Math.hypot(x - ax - dx * t, z - az - dz * t) < g.w / 2;
+      }
+      if (inside) v = g.add < 0 ? v * (1 + g.add) : Math.min(1, v + g.add);
+    }
+    return v;
   }
 
   // Its muddy feet: dirt laid back down on floor the brush can reach. An ellipse along the walking direction.
@@ -598,11 +625,13 @@ export class World {
     return {
       dirt: this.dirt.slice(), swept: this.swept.slice(), roomDirt: this.roomDirt.slice(),
       doors: Object.fromEntries(Object.values(this.doors).map((d) => [d.id, d.state])),
+      blocks: { ...this.blocks },
     };
   }
   restore(s) {
     this.dirt.set(s.dirt); this.swept.set(s.swept); this.roomDirt.set(s.roomDirt);
     for (const [id, st] of Object.entries(s.doors)) this.doors[id].state = st;
+    if (s.blocks) this.blocks = { ...s.blocks };
     this.refreshDoors();
     this.dirtBox = { i0: 0, i1: GW - 1, j0: 0, j1: GH - 1 };
   }

@@ -146,14 +146,15 @@ export class Hud {
       if (ri >= 0) { this.explored.add(ri); this.el.room.textContent = ROOMS[ri].name.toUpperCase(); }
       this.el.hidden.classList.toggle('on', r.hidden);
       this.el.hidden.textContent = r.outOfReach ? 'OUT OF REACH' : 'UNDER COVER';
-      let st = r.remote > 0 ? 'REMOTE SESSION · APP IN CONTROL' : r.docked ? 'DOCKED · CHARGING' : r.bin >= 100 ? 'BIN FULL · RETURN TO BASE' : r.battery < T.batteryLow ? 'LOW BATTERY · RETURN TO BASE'
+      let st = r.remote > 0 ? 'REMOTE SESSION · APP IN CONTROL' : r.docked ? (g.dockDead ? 'DOCKED · NO POWER' : 'DOCKED · CHARGING') : r.bin >= 100 ? 'BIN FULL · RETURN TO BASE' : r.battery < T.batteryLow ? 'LOW BATTERY · RETURN TO BASE'
         : !r.suction ? 'QUIET MODE · NOT CLEANING' : r.dirtRate > 15 ? 'DIRT DETECTED ▮▮▮' : r.dirtRate > 4 ? 'DIRT DETECTED ▮▯▯' : 'CLEANING';
       this.el.status.textContent = st;
       const task = g.story.task;
       if (task && task.progress) {
         const p = task.progress();
         this.el.taskBar.style.width = Math.min(100, (p / task.target) * 100) + '%';
-        this.el.taskPct.textContent = task.target === 1 && task.kind === 'dock' ? '' : `${Math.floor(p * 100)}% / ${Math.round(task.target * 100)}%`;
+        const items = task.kind === 'collect' ? g.items.list.filter((i) => i.def.task) : null;
+        this.el.taskPct.textContent = task.kind === 'dock' || task.kind === 'choice' ? '' : items ? `${items.filter((i) => i.taken).length} / ${items.length}` : `${Math.floor(p * 100)}% / ${Math.round(task.target * 100)}%`;
       } else { this.el.taskBar.style.width = '0%'; this.el.taskPct.textContent = ''; }
     }
 
@@ -161,7 +162,7 @@ export class Hud {
     this.routeTimer -= dt;
     if (this.routeTimer <= 0) {
       this.routeTimer = 1;
-      const need = !r.docked && (r.battery < 25 || r.bin >= 90);
+      const need = !r.docked && (r.battery < 25 || r.bin >= 90 || g.story.task?.kind === 'dock');
       this.route = need ? g.world.findPath(r.x, r.z, DOCK.x + 0.15, DOCK.z) : null;
     }
 
@@ -180,7 +181,7 @@ export class Hud {
   drawMap() {
     const g = this.game, w = g.world, img = this.mapImg.data;
     const taskRoom = g.story.task?.room != null ? w.roomIndex(g.story.task.room) : -1;
-    const lair = w.roomIndex('laundry');
+    const lair = ROOMS[w.roomIndex('laundry')].dirt ? -1 : w.roomIndex('laundry');   // the unexplored '?', until a night opens it up
     const pulse = 0.5 + 0.5 * Math.sin(g.time * 4);
     for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
       const c = j * GW + i, o = c * 4, ri = w.room[c];
@@ -204,7 +205,7 @@ export class Hud {
       if (!this.explored.has(ri) && !this.explored.has(rj)) continue;
       ctx.fillRect(p.x0 * s, p.z0 * s, (p.x1 - p.x0) * s, (p.z1 - p.z0) * s);
     }
-    if (this.explored.has(lair)) {
+    if (lair >= 0 && this.explored.has(lair)) {
       const r = ROOMS[lair];
       ctx.fillStyle = '#ff5040';
       ctx.font = '28px VT323, monospace';

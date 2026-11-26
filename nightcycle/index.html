@@ -68,7 +68,8 @@
   <section id="title" class="overlay">
     <div class="panel title-panel">
       <h1 class="logo" data-text="NIGHT CYCLE">NIGHT CYCLE</h1>
-      <p class="tag">You are a robot vacuum. The house is empty.<br>Mostly.</p>
+      <p class="tag" id="title-tag">You are a robot vacuum. The house is empty.<br>Mostly.</p>
+      <div id="title-night" class="diff nights" hidden></div>
       <div id="title-diff" class="diff"></div>
       <p id="title-diff-desc" class="muted small diff-desc"></p>
       <button id="btn-start" class="big">Start cleaning cycle</button>
@@ -81,7 +82,7 @@
         <div><kbd>Space</kbd> LIDAR scan</div>
         <div><kbd>Esc</kbd> pause</div>
       </div>
-      <p class="muted small keys-only">Gamepad: left stick drive · right stick look · <kbd>X</kbd> suction · <kbd>Y</kbd> lamp · <kbd>A</kbd> scan</p>
+      <p class="muted small keys-only pad-line">Gamepad: left stick drive · right stick look · <kbd>X</kbd> suction · <kbd>Y</kbd> lamp · <kbd>A</kbd> scan</p>
       <div class="controls touch-only">
         <div>Left thumb: drive</div>
         <div>Right thumb: look</div>
@@ -126,11 +127,13 @@
 
   <section id="end" class="overlay" hidden>
     <div class="panel">
-      <h2>NIGHT 1 COMPLETE</h2>
-      <p class="tag">The house is clean. The house is not empty.</p>
+      <h2 id="end-title">NIGHT 1 COMPLETE</h2>
+      <p class="tag" id="end-tag">The house is clean. The house is not empty.</p>
       <div id="end-stats"></div>
-      <p class="muted">Night 2: the laundry room.</p>
-      <button id="btn-again" class="big">Play again</button>
+      <p class="muted" id="end-next"></p>
+      <button id="btn-next" class="big">Continue: Night 2</button>
+      <button id="btn-again" class="ghost">Play again</button>
+      <button id="btn-night1" class="ghost" hidden>Back to Night 1</button>
     </div>
   </section>
 

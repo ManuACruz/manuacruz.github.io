@@ -131,6 +131,9 @@ button.ghost { border-color: rgba(111, 230, 255, 0.25); }
 .diff button { flex: 1; margin: 0; font-size: 1.15em; padding: 5px 8px; }
 .diff button.on { background: rgba(111, 230, 255, 0.22); color: #fff; border-color: var(--cyan); }
 .diff-desc { min-height: 1.3em; margin: 4px 0 8px; }
+.nights { margin-bottom: 10px; }
+.nights button { font-size: 1em; padding: 5px 4px; }
+.diff button:disabled { opacity: 0.4; cursor: default; }
 #end-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin: 18px 0; text-align: left; font-size: 1.2em; }
 #end-stats div { display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(111, 230, 255, 0.2); }
 #end-stats b { font-weight: normal; color: #fff; }
@@ -167,6 +170,19 @@ body.touch .keys-only { display: none; }
   #mapbox { right: 10px; top: 10px; }
   #task { top: auto; bottom: 10px; }
   .controls { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Short windows: the title card fits without scrolling down to the controls */
+@media (max-height: 720px) {
+  .title-panel { padding: 16px 24px; }
+  .title-panel .logo { font-size: clamp(40px, 9.5vh, 96px); }
+  .title-panel .tag { margin: 8px 0 12px; font-size: 1.2em; }
+  .title-panel .controls { margin: 12px 0 6px; }
+  .title-panel button.big { margin: 6px 0; }
+  .title-panel .diff-desc { margin: 3px 0 4px; }
+}
+@media (max-height: 620px) {
+  .title-panel .pad-line { display: none; }
 }
 
 /* Flashing effects off: no blinking or strobing anywhere */

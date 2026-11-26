@@ -406,6 +406,50 @@ export class Audio {
     o.start(t); o.stop(t + 0.1);
   }
 
+  // Something eating dog food, somewhere in the house (Night 5: at its bowl).
+  crunchAt(x, z, v = 1) {
+    this.cap('something eating', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, 1.1, z, { verb: 0.5 });
+    for (let k = 0; k < 4; k++) {
+      const tt = t + k * 0.11 + Math.random() * 0.05;
+      const n = this.noise(), bp = this.filter('bandpass', 900 + Math.random() * 1400, 2.5), g = this.gain();
+      n.connect(bp).connect(g).connect(dest);
+      this.env(g, tt, 0.002, 0.3 * v, 0.06);
+      n.start(tt, Math.random()); n.stop(tt + 0.09);
+    }
+  }
+
+  // A plug pulled out of a wall socket: a snap and a tiny spark.
+  unplug(x, y, z) {
+    this.cap('a plug pulled out', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, y, z, { verb: 0.35 });
+    const n = this.noise(), hp = this.filter('highpass', 2500), g = this.gain();
+    n.connect(hp).connect(g).connect(dest);
+    this.env(g, t, 0.001, 0.5, 0.025);
+    n.start(t, Math.random()); n.stop(t + 0.05);
+    const o = this.osc('square', 60), og = this.gain();
+    o.connect(og).connect(dest);
+    this.env(og, t + 0.01, 0.001, 0.08, 0.12);
+    o.start(t); o.stop(t + 0.2);
+  }
+
+  // A wall switch flicked, and the hum of a bulb coming on.
+  lightSwitch(x, y, z) {
+    this.cap('a light switch', x, z);
+    if (!this.ctx) return;
+    const t = this.now(), dest = this.spot(x, y, z, { verb: 0.4 });
+    const n = this.noise(), bp = this.filter('bandpass', 3500, 4), g = this.gain();
+    n.connect(bp).connect(g).connect(dest);
+    this.env(g, t, 0.001, 0.45, 0.02);
+    n.start(t, Math.random()); n.stop(t + 0.04);
+    const o = this.osc('sawtooth', 100), lp = this.filter('lowpass', 400), og = this.gain();
+    o.connect(lp).connect(og).connect(dest);
+    this.env(og, t + 0.02, 0.05, 0.03, 0.6, 0.3);
+    o.start(t); o.stop(t + 1.1);
+  }
+
   // A nightlight shorting out.
   pop(x, y, z) {
     this.cap('a light shorting out', x, z);

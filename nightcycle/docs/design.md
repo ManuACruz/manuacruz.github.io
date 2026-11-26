@@ -115,6 +115,113 @@ the robot's recognition scan, cyan rings on the floor and motes spiralling up.
 | Spill | Spot-clean the dog food outside the laundry door, next to where it lives. It crunches. |
 | Return | Dock. The report says "1 person was detected at home tonight. Was this you?" The map reveals an unexplored area behind the laundry. The lamp goes off for a final map scan: the room comes back cyan, except two long legs in red right in front of you. Then the camera pulls out of the robot: it is standing over you, leaning down. |
 
+## Night 2 beats (built)
+
+Same house, turned inside out. Each night is Night 1's layout with overrides (`NIGHTS` in `src/level.js`):
+the sofa (`sofaTipped`) lies on its back across the living-room/kitchen arch, solid, its underside and legs to the
+room; it can see over it but neither of you can get through. The coffee table is upside down (`tableFlipped`), so
+the living room, where the dock is, has no cover. The fridge stands pulled out in the kitchen, door open and lit,
+in front of a ragged hole (`kind: 'hole'`, 0.85 m by 1.7 m) into the laundry: torn paper and broken plasterboard
+round it, shards in the gap, plaster on the floor, grime where the fridge stood. The laundry door hangs open (the
+bolts were torn out last night), so the one loop in the house is now kitchen, hole, laundry, hall. The floor lamp,
+the clock and the nightlight by the bathroom stay dead from Night 1; the laundry bulb is on.
+
+It has learned where the dock is (`rules.dockLinger`): about a third of its patrols end standing over the dock for
+6 to 10 s, looking down at it, and two thirds once your battery is under 35% or your bin over 70%. On the last
+task it goes there first. It patrols the laundry and crosses through the hole; its lair is the hole beside the
+washing machines.
+
+| Task | Beat |
+| --- | --- |
+| Living room | "Map mismatch: 3 objects moved." The arch is blocked. At 30% the dock chimes by itself and its light flashes red ("docking signal from unknown device"); at 55% knocks come along inside the wall toward the dock. It is not out yet. |
+| Kitchen | You go round by the hall. The fridge is out, the hole behind it, the laundry bulb shining through, the kibble trail now leading into it. At 45%: a thump and scraping in the laundry; it waits until the hole is on screen (12 s at most), then folds itself through, crosses the kitchen (if you are in its way it stops over you for up to 3 s, then steps on), walks the hall and stops bent over the dock. Its muddy prints appear under its feet as it goes. "Home Base: contact detected." |
+| Footprints | Spot-clean its prints, from the hole to the dock. |
+| Laundry | Its room: concrete (loud), no cover, the nest, the north-wall hole. Halfway the door slams and the bulb stutters, so the hole is the only way out for 10 s. |
+| Spill | The dog food is dragged out through the hole into the kitchen. It crunches. |
+| Return | It goes to the dock first. Docked: the report ("Home Base lost power 3 times tonight"), the map finds a hollow floor behind the dryer, Night Mode. Footsteps come up in the dark, a breath, a click: the plug is pulled out of the wall and the dock's light dies. A last scan shows it crouched right in front of you, its hand on the plug. |
+
+Night 2's archive: the realtor's card ("Do NOT show the laundry"), the feeding chart, Biscuit's chewed collar, a
+notebook page ("It isn't a man. It wears the shape of one"), a flash Polaroid of the laundry, a basement key, and
+the family's checklist ("Leave the robot on its night schedule. Something has to make noise in the house, or it
+comes looking for us").
+
+## Night 3 beats (built)
+
+Extends Night 2 (the sofa is still in the arch, the hole still open). The plug it pulled at the end of Night 2 is
+still out: the old dock is dead, the robot wakes there on 55%, and the app has sent a spare (`dock2`), in the hall
+by the bedroom door, plugged into the hall socket and facing the kitchen arch. (By the bedroom door inside the
+room was tried first: with that door open its leaf cuts the corner off from it.) The dust sheets are off; the
+dryer is shoved aside from an open basement hatch (`hatch`), its padlock cut from underneath. Its lair is the hatch.
+
+`rules.unplug`: when it waits at your dock it pulls the plug (`Game.unplugDock`): the dock's light dies, docking
+neither charges nor empties the bin, and the smart plug comes back after 40 s. `Game.unplug` takes the fridge, the
+laundry bulb, the nightlights or the TV off with the same snap.
+
+| Task | Beat |
+| --- | --- |
+| Get to the spare Home Base | On battery, across the house; the map draws the way. |
+| Bedroom | At 25% the fridge, the laundry bulb and the nightlights go dark one by one, each with a snap where its plug was. At 50% a thump under the laundry floor: it comes up the hatch, walks out and along the hall to your new dock, crouches, and pulls the plug. |
+| Bathroom | The far end from the dock, so the battery matters. The baby monitor picks up breathing in Theo's room. |
+| Batteries | Six smoke-alarm batteries, one under the alarm in each room off the hall and one in the hall: a collect task (`items` with `task: true`, on the floor only once the task starts). |
+| Kitchen | Dark. Halfway, the fridge door swings shut by itself. |
+| Return | Docked, lamp off, facing the arch: a snap, the fridge is plugged back in and swings open, and in its light it is standing in the arch, looking at you. |
+
+Archive: the parents' half of the baby monitor (breathing), the agent's letter ("pets included": "He isn't a pet"),
+Theo's sticker chart ("Fed him" ★★★★★★★★), the fourth toothbrush, chewed flat, and the padlock, cut from underneath.
+
+## Night 4 beats (built)
+
+Extends Night 1: everything is back where it was, the sheets are on, the clock is going, and the family's photos are
+on the hall walls (`decor`), as if they never left. Only the hatch is open, and plywood is screwed over the hole on
+the laundry side. The dock is back in the living room. The power works: six rooms have ceiling lights (`ceiling`).
+
+`rules.lights`: now and then, as it picks where to go next, it switches on the light in the room you are in (two
+at most, with a click and a hum). In a lit room it sees you as if your headlamp were on; under furniture you are
+still hidden. The app's energy saver switches a light off after 40 s. The death tip says so when that is what did it.
+
+| Task | Beat |
+| --- | --- |
+| Living room | "Layout restored." The floor lamp is on. The TV wakes up until you get near it. |
+| Kitchen | At 25% its light comes on ("scheduled by: unknown user"). At 55% the hall's switches click one after another from the laundry end, the hall light comes on, and it is standing in the kitchen arch, looking at you; then it walks off to the laundry, opening the door. |
+| Theo's room | His toys are out again. At 40% the light comes on, then the music box. |
+| Toys | Six toys in his room and the hall, out only once the task starts: a collect task. |
+| Hallway | Its feet leave mud again. At 35% a "test shot for the listing" switches on the lights in the three rooms nearest you. |
+| Return | "Listing photos in 3... 2... 1...": a flash, every light on, and it is bent right over the dock. |
+
+Archive: Theo's party invitation (next week; the house sold last month), a shopping list ("it likes the light now"),
+the bulb out of Theo's nightlight, still warm, and the porch photo with a long pale arm round Dad's shoulders.
+
+## Night 5 beats (built)
+
+Extends Night 4. The app's messages come from "Home 🙂" (`app`). The dock is in the laundry, on its east wall; the
+laundry door is open, its bulb on, its bowl by the dog bed. The photos are turned to the wall. Biscuit's old dog door
+in the living room's outside wall (`kind: 'flap', outside: true`) is screwed shut with plywood (`blocks.dogflap`,
+a solid the story can remove with `World.setBlock`).
+
+Its lair here is its bowl (`lair.eat`): it shuts itself in and eats, visible, bent over the bowl, crunching; if you
+come into view close by, it looks up and comes out. In the last task it gets hungry every 50 s or so (`hungry`).
+
+| Task | Beat |
+| --- | --- |
+| Clean the Laundry 🙂 | You wake in its room. "I made the schedule tonight." Halfway it climbs out of the hatch beside you, eats at its bowl, and gets up: "Don't mind me 🙂 Keep cleaning." For 30 s it means it (`Entity.truce`): it ignores noise and only notices you if you drive into it. |
+| Bring my food 🙂 | The dog food bag torn open in the kitchen, a trail to its bowl. |
+| Clean where they slept 🙂 | The bedside lamp comes on by itself for a while. |
+| Clean Theo's room 🙂 | "He'll be back on Saturday. A new Theo." |
+| Finish the cycle | The plywood falls off the dog door. Three ways out (below). |
+
+**Endings** (each is remembered; the end screen counts them):
+
+- **Stay**: dock at Home Base, in its room. "Welcome home 🙂" Footsteps; a last scan shows it crouched beside you, a
+  hand on you. "Next clean: 03:00 AM. Every night 🙂" The listing says SOLD; the new family moves in Saturday.
+- **Leave**: out through the dog door into the garden. The camera turns back to the house: in the lit living-room
+  window, bent under the curtain rail, it watches you go, as in the Night 1 Polaroid.
+- **Keep it fed**: while it is shut in eating, hold the laundry door from the hall for 2.5 s (Dad's last note says
+  how). The smart lock engages; it hits the door three times, knocks, then goes back to eating. BrightHome:
+  "Laundry removed from cleaning. 03:00 AM: dispense food 🐶".
+
+Archive: Dad's last note, the SOLD listing, a new drawing (the house, the Long Man and a little round robot, all
+smiling) and the four screws from the dog door.
+
 ## Story (the archive)
 
 The Marsh family (Mom, Dad, Theo, and Biscuit the dog) left in a hurry. Found objects tell it:
@@ -126,6 +233,8 @@ Nothing is explained outright. The dog bowl in the kitchen is freshly filled.
 
 ## Full game direction
 
+- **Nights 2 to 5** are built (above), with the three endings. Still to do from this list: the upgrades, the
+  other robots, the attic, and a basement you can go down into.
 - **Nights 2 to 5**, same house, changing: new rooms unlock (laundry, a basement hatch behind the dryer, the
   attic pull-down only reachable by the stairs-climbing upgrade), furniture moves between nights, sheets come
   off, the family's things come back.
@@ -168,6 +277,8 @@ checking this.
   HD is fill-rate bound (every light costs every pixel), so lights that are off are removed and HD scales its
   internal resolution down automatically when frames run long.
 - The robot voice is the browser's speech synthesis and varies by system (can be turned off).
-- No save between sessions: closing the tab restarts the night.
+- No save inside a night: closing the tab restarts it. Finishing a night is remembered (`localStorage`), which
+  opens the next one in the title's night picker. A night is picked at page load (`?night=2`), so changing night
+  reloads the page; the level tables are swapped before anything is built.
 - Balance numbers (battery, bin, noise, sight) were tuned by reasoning and simulation, not by hours of play.
   They all live in `src/tune.js`.
