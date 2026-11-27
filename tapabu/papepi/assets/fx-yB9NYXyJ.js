@@ -1,4 +1,4 @@
-import{a as e,i as t,n,o as r,r as i,t as a}from"./index-BgsUBvrd.js";var o=`1.0.0`,s=`
+import{a as e,i as t,n,o as r,r as i,t as a}from"./index-BOtOhVUD.js";var o=`1.0.0`,s=`
 #fx-board {
   position: fixed; left: 0; top: 0; bottom: 0; z-index: 18;
   width: min(400px, 94vw); box-sizing: border-box; padding: 14px 14px 40px;
