@@ -466,7 +466,20 @@ export function waitFar(sim, maxT = 30) {
   }
 }
 
-// Play a level's solution on a fresh sim. `onStep(sim, step, situation, afterWait)` runs before each tap or swipe;
+// Run a swing out to its far end and back to the end it was joined at.
+export function waitBack(sim, maxT = 30) {
+  const sw = sim.ch.sw;
+  if (!sw) return;
+  const ends = sw.ends;
+  for (let t = 0; t < maxT; t += STEP) {
+    if (sim.ch.state !== 'swing' || sim.ch.sw !== sw) return;
+    if (sw.ends > ends && sw.lastEnd === sw.start) return;
+    sim.step(STEP);
+  }
+}
+
+// Play a level's solution on a fresh sim. Steps: a pin id (tap), a number (swipe up, leaning that many degrees),
+// 'wait' (swing to the far end) or 'back' (swing out and back to the near end). `onStep(sim, step, situation, afterWait)` runs before each tap or swipe;
 // `onTick(sim)`, if given, after every sim step.
 export function playSolution(level, T, onStep, onTick) {
   const sim = new Sim(level, T);
@@ -487,9 +500,10 @@ export function playSolution(level, T, onStep, onTick) {
       error = `${sim.ch.state} before step ${rec.length + 1} (${st})`;
       break;
     }
-    if (st === 'wait') {
-      waitFar(sim);
-      afterWait = true;
+    if (st === 'wait' || st === 'back') {
+      if (st === 'wait') waitFar(sim);
+      else waitBack(sim);
+      afterWait = st === 'wait' ? 'far' : 'back';
       continue;
     }
     const sit = sim.situation();

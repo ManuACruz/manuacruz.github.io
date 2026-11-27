@@ -1,13 +1,17 @@
 // The sticker album: slides in at a goal; the player drags the collected emoji stickers into the empty slots.
+// The page's layout comes from the goal's board type (src/boards.js). With `view: true` it shows a finished (or empty)
+// page read-only, for the album menu.
 import { tween, ease, lerp, clamp, rand, burst, ring, confetti, emit } from './fx.js';
 import { drawEmoji, UI_FONT } from './sprites.js';
 import { sfx } from './audio.js';
+import { layoutBoard } from './boards.js';
 
 const PAPER = '#fff8ea';
 const INK = '#5b4a3a';
 
 export class Album {
-  // opts: { title, caption, parts, stickers (kind -> emoji), items: [{id, kind}], homeOf(i) -> {x,y} (screen), factMin, onDone, onPlace }
+  // opts: { title, subtitle, board, stickers (kind -> emoji), items: [{id, kind}], homeOf(i) -> {x,y} (screen), factMin, onDone, onPlace }
+  //   view mode: { view: true, filled: bool, title, subtitle, board, stickers } (no items, no input)
   constructor(opts) {
     this.o = opts;
     this.phase = 'in';
@@ -20,9 +24,24 @@ export class Album {
     this.stamp = { s: 0, a: 0, rot: -0.2 };
     this.caption = { a: 0, y: 20 };
     this.closable = false;
-    this.parts = opts.parts.map((p) => ({ kind: p.kind, u: p.at[0], v: p.at[1], slot: !!p.slot, filled: !p.slot, s: 1, rot: rand(-0.18, 0.18), shake: 0, glow: 0, x: 0, y: 0 }));
-    this.items = opts.items.map((it, i) => ({ ...it, i, state: 'home', x: 0, y: 0, s: 1, rot: 0, vx: 0, tx: 0, ty: 0, fly: null }));
+    const lay = layoutBoard(opts.board);
+    this.deco = lay.deco;
+    this.rK = lay.r;
+    this.view = !!opts.view;
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280) * 0.36 - 0.18; // the same tilt every time
+    this.parts = lay.parts.map((p) => ({
+      kind: p.kind, u: p.u, v: p.v, slot: p.slot, accept: p.accept, group: p.group,
+      filled: !p.slot || (this.view && opts.filled), s: 1, rot: rnd(), shake: 0, glow: 0, x: 0, y: 0,
+    }));
+    this.items = (opts.items || []).map((it, i) => ({ ...it, i, state: 'home', x: 0, y: 0, s: 1, rot: 0, vx: 0, tx: 0, ty: 0, fly: null }));
     this.hand = { t: 0, on: false };
+    if (this.view) {
+      this.caption = { a: 1, y: 0 };
+      if (opts.filled) this.stamp = { s: 1, a: 1, rot: -0.18 };
+      tween(this, { slide: 1 }, 0.4, { ease: ease.backOut, done: () => (this.phase = 'view') });
+      return;
+    }
     sfx.page();
     tween(this, { slide: 1 }, 0.55, { ease: ease.backOut, done: () => (this.phase = 'play') });
   }
@@ -36,10 +55,13 @@ export class Album {
   }
 
   layout(W, H) {
-    const bx = W * 0.27 + (1 - this.slide) * W * 0.78 + this.shakeX;
-    const bw = W - W * 0.27;
+    // in view mode the page sits on the left (the album menu's buttons are on the right),
+    // otherwise it slides over the right of the level
+    const left = this.view ? W * 0.04 : W * 0.27;
+    const bx = left + (1 - this.slide) * W * (this.view ? 0.95 : 0.78) + this.shakeX;
+    const bw = this.view ? W * 0.74 - 40 : W - W * 0.27;
     const ax = bx + bw * 0.13, aw = bw * 0.8, ay = H * 0.2, ah = H * 0.54;
-    const r = clamp(Math.min(aw, ah) * 0.13, 22, 62);
+    const r = clamp(Math.min(aw, ah) * this.rK, 18, 62);
     this.g = { bx, bw, W, H, ax, aw, ay, ah, r };
     for (const p of this.parts) {
       p.x = ax + p.u * aw;
@@ -195,9 +217,14 @@ export class Album {
     tween(it, { s: 1 }, 0.3, { ease: ease.backOut });
   }
 
+  // a slot takes its own kind, or (sorting into groups) any kind its hoop accepts
+  fits(p, it) {
+    return p.accept ? p.accept.includes(it.kind) : p.kind === it.kind;
+  }
+
   tryPlace(it, p) {
     if (this.sel === it) this.sel = null;
-    if (p.kind !== it.kind) {
+    if (!this.fits(p, it)) {
       p.shake = 1;
       sfx.wrong();
       this.sendHome(it);
@@ -210,6 +237,7 @@ export class Album {
       done: () => {
         it.state = 'placed';
         p.filled = true;
+        p.kind = it.kind;
         p.s = 1.55;
         tween(p, { s: 1 }, 0.55, { ease: ease.elasticOut });
         this.shakeX = 10;
@@ -327,7 +355,7 @@ export class Album {
     ctx.fillStyle = 'rgba(91, 74, 58, 0.6)';
     ctx.fillText(this.o.subtitle || '', bx + bw * 0.12, H * 0.1 + ts * 0.85);
 
-    this.drawLoop(ctx);
+    this.drawDeco(ctx);
 
     // parts
     for (const p of this.parts) {
@@ -357,7 +385,14 @@ export class Album {
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
-        drawEmoji(ctx, this.o.stickers[p.kind], p.x + sx, p.y, r * 0.92, 'ghost', 0, 0.28);
+        // a sorting slot doesn't give away which sticker goes there
+        if (p.accept) {
+          ctx.fillStyle = 'rgba(91, 74, 58, 0.35)';
+          ctx.font = `700 ${r * 1.1}px ${UI_FONT}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('?', p.x + sx, p.y + 2);
+        } else drawEmoji(ctx, this.o.stickers[p.kind], p.x + sx, p.y, r * 0.92, 'ghost', 0, 0.28);
       }
     }
 
@@ -425,7 +460,7 @@ export class Album {
   drawHand(ctx) {
     const it = this.items.find((i) => i.state === 'home' || i.state === 'sel');
     if (!it) return;
-    const p = this.parts.find((q) => q.slot && !q.filled && q.kind === it.kind);
+    const p = this.parts.find((q) => q.slot && !q.filled && this.fits(q, it));
     if (!p) return;
     const T = 2.0, k = (this.hand.t % T) / T;
     let x, y, press = 0, a = 1;
@@ -441,6 +476,90 @@ export class Album {
     }
     if (press > 0.5 && k > 0.15 && k < 0.85) drawEmoji(ctx, this.o.stickers[it.kind], x, y, this.g.r * 0.7, 'sticker', 0, 0.5);
     drawHand(ctx, x, y, press, a, this.g.r);
+  }
+
+  // what the board teaches, drawn under the stickers: arrows, links, hoops, a number, a strip
+  drawDeco(ctx) {
+    const d = this.deco;
+    if (d.type === 'cycle') return this.drawLoop(ctx);
+    const { ax, aw, ay, ah, r } = this.g;
+    const P = this.parts;
+    const ink = 'rgba(176, 138, 90, 0.8)';
+    ctx.save();
+    ctx.lineCap = 'round';
+    if (d.type === 'pattern' && P.length) {
+      const a = P[0], b = P[P.length - 1];
+      ctx.fillStyle = 'rgba(176, 138, 90, 0.12)';
+      roundRect(ctx, a.x - r * 1.45, a.y - r * 1.45, b.x - a.x + r * 2.9, r * 2.9, r * 0.6);
+      ctx.fill();
+      ctx.setLineDash([3, 9]);
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const arrow = (a, b, gap) => {
+      const ang = Math.atan2(b.y - a.y, b.x - a.x), len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < gap * 2 + 10) return;
+      const x0 = a.x + Math.cos(ang) * gap, y0 = a.y + Math.sin(ang) * gap;
+      const x1 = b.x - Math.cos(ang) * gap, y1 = b.y - Math.sin(ang) * gap;
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 4;
+      ctx.setLineDash([2, 11]);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = ink;
+      ctx.save();
+      ctx.translate(x1, y1);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(4, 0);
+      ctx.lineTo(-11, -8);
+      ctx.lineTo(-11, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    };
+    for (const [i, j] of d.arrows || []) arrow(P[i], P[j], r * 1.3);
+    for (const [i, j] of d.links || []) arrow(P[i], P[j], r * 1.35);
+    for (const g of d.groups || []) {
+      const cx = ax + g.u * aw, cy = ay + g.v * ah, rx = g.rx * aw, ry = g.ry * ah;
+      ctx.fillStyle = 'rgba(176, 138, 90, 0.08)';
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash([10, 8]);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // the hoop's badge says what belongs in it
+      const by = cy - ry, br = clamp(r * 0.75, 16, 34);
+      ctx.fillStyle = '#fffdf5';
+      ctx.beginPath();
+      ctx.arc(cx, by, br * 1.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      drawEmoji(ctx, g.icon, cx, by, br);
+    }
+    if (d.number != null) {
+      const fs = Math.min(ah * 0.62, aw * 0.3);
+      ctx.font = `700 ${fs}px ${UI_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = fs * 0.08;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#5b4a3a';
+      ctx.fillStyle = '#ffd23f';
+      const nx = ax + aw * 0.15, ny = ay + ah * 0.52;
+      ctx.strokeText(String(d.number), nx, ny);
+      ctx.fillText(String(d.number), nx, ny);
+      arrow({ x: nx, y: ny }, { x: ax + aw * 0.4, y: ny }, fs * 0.33);
+    }
+    ctx.restore();
   }
 
   drawLoop(ctx) {

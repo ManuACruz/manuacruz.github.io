@@ -1,6 +1,6 @@
 // Hopper: loop, input, camera, drawing, help and flow.
 import { T } from './tune.js';
-import { LEVELS } from './levels.js';
+import { LEVELS, WORLDS } from './levels.js';
 import { Sim, scaleLevel, playSolution, sameSituation, goalSlots, STEP, R, PIN_R, ITEM_R, GOAL_W, GOAL_H } from './sim.js';
 import { CamSpots, levelFits, viewScale } from './cam.js';
 import { tween, after, ease, lerp, clamp, rand, pick, burst, ring, confetti, emit, particles, updateTweens, updateParticles, drawParticles, shake, addShake, updateShake, killTweens } from './fx.js';
@@ -51,12 +51,26 @@ const G = {
   lookT: 0,
   look: null,
   lastSwingSign: 0,
-  progress: 0,
+  done: new Set(), // ids of finished levels (their album pages are full)
 };
 
 try {
-  G.progress = Number(localStorage.getItem('hopper.progress')) || 0;
+  G.done = new Set(JSON.parse(localStorage.getItem('hopper.done') || '[]'));
 } catch {}
+
+function saveDone() {
+  try {
+    localStorage.setItem('hopper.done', JSON.stringify([...G.done]));
+  } catch {}
+}
+const isDone = (i) => G.done.has(LEVELS[i].id);
+// a level opens once the one before it is done
+const isUnlocked = (i) => i === 0 || isDone(i) || isDone(i - 1);
+// where Play goes: the first level not done yet
+const nextLevel = () => {
+  const i = LEVELS.findIndex((l, k) => !isDone(k));
+  return i < 0 ? 0 : i;
+};
 
 // ---------- stage, resize, portrait rotation ----------
 function resize() {
@@ -229,7 +243,7 @@ function endIntro() {
 }
 
 function showBanner() {
-  const b = (G.banner = { y: -120, a: 1, s: 0.6, sub: `Page ${G.li + 1}`, title: G.L.page.title });
+  const b = (G.banner = { y: -120, a: 1, s: 0.6, sub: `Level ${G.L.raw.num}`, title: G.L.page.title });
   tween(b, { y: 0, s: 1 }, 0.5, { ease: ease.backOut });
   tween(b, { y: -140, a: 0 }, 0.35, { delay: 1.9, ease: ease.backIn, done: () => G.banner === b && (G.banner = null) });
 }
@@ -302,6 +316,7 @@ function tapAt(x, y) {
 const keys = {};
 window.addEventListener('keydown', (e) => {
   keys[e.key] = true;
+  if (ui.menuOpen() && !ui.settingsOpen()) return ui.menuKey(e.key);
   if (e.key === 'Escape') return ui.toggleSettings();
   if (e.repeat) return;
   unlock();
@@ -538,9 +553,9 @@ function openAlbum(goal) {
   const L = G.L;
   G.album = new Album({
     title: L.page.title,
-    subtitle: `Page ${G.li + 1}${L.goals.length > 1 ? ` · part ${goal.i + 1} of ${L.goals.length}` : ''}`,
+    subtitle: `Level ${L.raw.num}${L.goals.length > 1 ? ` · part ${goal.i + 1} of ${L.goals.length}` : ''}`,
     caption: goal.board.caption,
-    parts: goal.board.parts,
+    board: goal.board,
     stickers: L.page.stickers,
     items: slots.map((sl) => ({ id: sl.id, kind: L.items.find((it) => it.id === sl.id).kind })),
     homeOf: (i) => w2s(slots[i].x, slots[i].y),
@@ -567,10 +582,8 @@ function closeAlbum() {
   }
   // party
   G.mode = 'party';
-  G.progress = Math.max(G.progress, G.li + 1);
-  try {
-    localStorage.setItem('hopper.progress', String(G.progress));
-  } catch {}
+  G.done.add(G.L.raw.id);
+  saveDone();
   Object.assign(G.camT, G.fits ? levelCenter() : (() => {
     const r = G.spots.rects[G.spots.spotFor(g.x, g.y)];
     return { x: r.cx, y: r.cy, z: r.z };
@@ -593,9 +606,10 @@ function closeAlbum() {
   sfx.solved();
   bigConfetti();
   after(1.2, () => G.party === party && bigConfetti());
-  G.banner = { y: -120, a: 1, s: 0.6, sub: `Page ${G.li + 1} complete!`, title: '★ Sticker page filled ★', stay: true };
+  G.banner = { y: -120, a: 1, s: 0.6, sub: `Level ${G.L.raw.num} complete!`, title: '★ Sticker page filled ★', stay: true };
   tween(G.banner, { y: 0, s: 1 }, 0.6, { ease: ease.backOut });
-  after(T.nextT, () => G.party === party && ui.showNext(true, G.li === LEVELS.length - 1 ? 'Play again' : 'Next page'));
+  G.nextLabel = G.li === LEVELS.length - 1 ? '📒 Album' : 'Next level';
+  after(T.nextT, () => G.party === party && G.mode === 'party' && ui.showNext(true, G.nextLabel));
 }
 
 function bigConfetti() {
@@ -667,8 +681,9 @@ function currentStep() {
     if (!sameSituation(rec[i].sit, sit)) continue;
     const r = rec[i];
     if (r.afterWait) {
-      const sw = sim.ch.sw;
-      if (!sw || sw.u * -sw.start < 0.5) return { wait: true };
+      // wait until the swing is near the end the solution taps at: the far end, or back at the near end
+      const sw = sim.ch.sw, k = r.afterWait === 'back' ? 1 : -1;
+      if (!sw || sw.u * k * sw.start < 0.5) return { wait: true };
     }
     return r;
   }
@@ -738,7 +753,7 @@ function update(dt) {
     }
     swingWhoosh();
     speedLines();
-  } else if (G.mode === 'win' || G.mode === 'board' || G.mode === 'party') {
+  } else if (G.mode === 'win' || G.mode === 'board' || G.mode === 'party' || G.mode === 'menu') {
     sim.events.length = 0;
   }
   for (const f of G.goalFx) f.shake = Math.max(0, f.shake - dt);
@@ -1288,15 +1303,54 @@ function drawWipe() {
 
 // ---------- boot ----------
 const ui = initUI({
-  levels: LEVELS.map((l) => ({ name: l.name, title: l.page.title })),
-  progress: () => G.progress,
-  onPlay: () => startIntro(),
+  levels: LEVELS.map((l) => ({
+    id: l.id, num: l.num, name: l.name, title: l.page.title, world: l.world, goals: l.goals.length,
+    stickers: l.items.map((it) => l.page.stickers[it.kind]),
+  })),
+  worlds: WORLDS.map((w) => ({ title: w.title, icon: w.icon })),
+  done: isDone,
+  unlocked: isUnlocked,
+  next: nextLevel,
+  onPlay: () => {
+    if (G.li !== nextLevel()) loadLevel(nextLevel());
+    startIntro();
+  },
   onRestart: () => restart(),
   onNext: () => {
     G.party = null;
     G.banner = null;
+    if (G.li === LEVELS.length - 1) return ui.openMenu();
     loadLevel(G.li + 1);
     startIntro();
+  },
+  // the album menu: the game waits behind it; a viewed page is drawn by an Album in view mode
+  onMenu: (open, toPlay) => {
+    if (open) {
+      G.menuFrom = G.mode;
+      G.mode = 'menu';
+      ui.showNext(false);
+      return;
+    }
+    G.album = null;
+    G.mode = G.menuFrom || 'title';
+    if (toPlay) return;
+    if (G.mode === 'title') ui.showTitle();
+    if (G.mode === 'party' && G.nextLabel) ui.showNext(true, G.nextLabel);
+  },
+  showPage: (li, gi) => {
+    const raw = LEVELS[li], g = raw.goals[gi];
+    G.album = new Album({
+      view: true,
+      filled: isDone(li),
+      title: raw.page.title,
+      subtitle: `Level ${raw.num}${raw.goals.length > 1 ? ` · part ${gi + 1} of ${raw.goals.length}` : ''}`,
+      caption: g.board.caption,
+      board: g.board,
+      stickers: raw.page.stickers,
+    });
+  },
+  hidePage: () => {
+    if (G.mode === 'menu') G.album = null;
   },
   onLevel: (i) => {
     G.party = null;
@@ -1307,15 +1361,13 @@ const ui = initUI({
   },
   onSkip: () => skipToBoard(),
   onResetProgress: () => {
-    G.progress = 0;
-    try {
-      localStorage.removeItem('hopper.progress');
-    } catch {}
+    G.done.clear();
+    saveDone();
   },
   paused: (v) => (G.paused = v),
 });
 
-loadLevel(Math.min(G.progress, LEVELS.length - 1));
+loadLevel(nextLevel());
 G.mode = 'title';
 ui.showButtons(false);
 requestAnimationFrame(frame);

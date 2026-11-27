@@ -1,4 +1,5 @@
-// Draft a level's camera spots from its solution: node tools/autocam.mjs --level 3 [--iters 30000] [--seed 1] [--pad 10]
+// Draft a level's camera spots from its solution: node tools/autocam.mjs --level 2-7 [--iters 30000] [--seed 1] [--pad 10]
+// Without --level it drafts every level bigger than the screen.
 // Groups the solution steps into as few spots as the framing rules allow (src/cam.js FRAME), then nudges the spots
 // against the real camera picker until no step breaks a rule. Prints a `cams:` line in the level's drawing units.
 // A draft: paste it into levels.js, then check it with tools/framing.mjs and by playing.
@@ -10,7 +11,7 @@ import { frameLevel, printFrame } from './framing.mjs';
 
 const args = process.argv.slice(2);
 const arg = (k, d) => (args.includes('--' + k) ? Number(args[args.indexOf('--' + k) + 1]) : d);
-const LEVEL = arg('level', 0);
+const LEVEL = args.includes('--level') ? args[args.indexOf('--level') + 1] : null; // a number like 2-3, an id, or a list index
 const ITERS = arg('iters', 30000);
 let seed = arg('seed', 1);
 const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
@@ -143,6 +144,8 @@ function draft(raw) {
 }
 
 LEVELS.forEach((raw, i) => {
-  if ((LEVEL && LEVEL !== i + 1) || !raw.cams) return;
+  if (LEVEL && ![raw.num, raw.id, String(i + 1)].includes(LEVEL)) return;
+  const L = scaleLevel(raw);
+  if (L.w <= T.viewW && L.h <= T.viewH) return;
   draft(raw);
 });

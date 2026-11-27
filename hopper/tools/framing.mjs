@@ -1,4 +1,4 @@
-// Camera framing report: node tools/framing.mjs [--level 3]
+// Camera framing report: node tools/framing.mjs [--level 2-7]
 // Plays each level's solution with the camera following it, and before every step checks the framing rules in
 // src/cam.js (FRAME): Hopper and the next pin well inside the view, the swing he's on and where the next pin takes him
 // on screen, the floor shown under his feet, no pin under the HUD. tools/check.mjs fails on any problem found here.
@@ -49,11 +49,11 @@ export function printFrame(L, T, f) {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
-  const only = args.includes('--level') ? Number(args[args.indexOf('--level') + 1]) : 0;
+  const only = args.includes('--level') ? args[args.indexOf('--level') + 1] : null;
   const T = { ...DEFAULTS };
   let bad = 0;
   LEVELS.forEach((raw, i) => {
-    if (only && only !== i + 1) return;
+    if (only && ![raw.num, raw.id, String(i + 1)].includes(only)) return;
     const L = scaleLevel(raw);
     const f = frameLevel(L, T);
     console.log(`\n${raw.name}  ${f.big ? `${L.cams.length} spots` : 'fits the screen'}, level ${L.w.toFixed(0)} x ${L.h.toFixed(0)}`);

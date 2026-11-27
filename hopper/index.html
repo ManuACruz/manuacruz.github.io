@@ -33,10 +33,14 @@
       <div class="title-card">
         <h1 class="logo" aria-label="Hopper"><span>H</span><span>o</span><span>p</span><span>p</span><span>e</span><span>r</span></h1>
         <p class="sub">Tap the pins · swipe up to jump · fill the sticker album</p>
-        <button id="btn-play" class="big">Play <span>▸</span></button>
+        <div class="title-buttons">
+          <button id="btn-play" class="big">Play <span>▸</span></button>
+          <button id="btn-album" class="big alt">📒 Album</button>
+        </div>
       </div>
     </div>
 
+    <div id="menu" class="overlay" hidden></div>
     <div id="settings" class="overlay" hidden></div>
   </div>
   <script type="module" src="src/game.js"></script>

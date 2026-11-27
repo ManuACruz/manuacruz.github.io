@@ -1,60 +1,30 @@
-// Level data, in each level's own drawing coordinates (multiplied by `unit` at load).
-// `page` is the sticker-album page the level fills: its title and the emoji for each item kind.
-// `cams` are camera spots [x, y, zoom?] (zoom < 1 shows more); draft them with tools/autocam.mjs, check with tools/framing.mjs.
+// Level data, one file per world in src/levels/, in each level's own drawing coordinates (multiplied by `unit` at load;
+// unit defaults to 1, where the reference screen is 1376 x 692).
+// A level: id (saves use it), page (its album page: title, and the emoji for each item kind), size, start, blocks
+// [x, y, w, h], pins, items, goals (each with the album board it fills, see src/boards.js), solution, and for levels
+// bigger than the screen `cams` [x, y, zoom?] (draft with tools/autocam.mjs, check with tools/framing.mjs).
+// The order teaches one thing at a time: Meadow walks and jumps, Woods adds the orange dash pins, Pond the teal swings,
+// Hive mixes them and adds levels with goals in a row.
+import meadow from './levels/meadow.js';
+import woods from './levels/woods.js';
+import pond from './levels/pond.js';
+import hive from './levels/hive.js';
 
-export const LEVELS = [
-  {
-    name: 'Level 1',
-    page: { title: 'Rainy Day', stickers: { k1: '💧', k2: '☁️', k3: '🌈' } },
-    size: [1376, 692], unit: 1, start: [204, 450],
-    blocks: [[32, 450, 345, 400], [700, 450, 633, 400]],
-    pins: [{ id: 'a1', t: 'A', x: 780, y: 124 }, { id: 'c1', t: 'C', x: 1160, y: 450 }],
-    items: [{ id: 'i1', kind: 'k1', x: 528, y: 290 }],
-    goals: [{ at: [1160, 450], items: ['i1'],
-      board: { caption: 'Clouds make rain, rain makes clouds!', parts: [{ kind: 'k2', at: [0.5, 0.2] }, { kind: 'k1', at: [0.5, 0.8], slot: true }] } }],
-    solution: ['a1', 'c1'],
-  },
-  {
-    name: 'Level 2',
-    page: { title: 'Little Wings', stickers: { k1: '🐛', k2: '🥚', k3: '🦋' } },
-    size: [842, 424], unit: 1.63, start: [135, 264],
-    blocks: [[41, 264, 274, 400], [315, 182, 190, 482], [505, 264, 279, 400]],
-    pins: [{ id: 'c1', t: 'C', x: 663, y: 264 }],
-    items: [{ id: 'i1', kind: 'k1', x: 412, y: 139 }],
-    goals: [{ at: [663, 264], items: ['i1'],
-      board: { caption: 'Egg, caterpillar, butterfly… and round again!', parts: [{ kind: 'k2', at: [0.34, 0.2] }, { kind: 'k3', at: [0.68, 0.2] }, { kind: 'k1', at: [0.5, 0.8], slot: true }] } }],
-    solution: ['c1', 0],
-  },
-  {
-    name: 'Level 3',
-    page: { title: 'Sunflower', stickers: { k1: '🌱', k2: '🌻', k3: '🌰' } },
-    size: [1478, 610], unit: 1.9, start: [128, 487],
-    blocks: [[44, 487, 169, 200], [310, 228, 378, 22], [543, 434, 53, 300], [784, 487, 169, 200], [1285, 172, 169, 600]],
-    pins: [{ id: 'b1', t: 'B', x: 361, y: 337, len: 140 }, { id: 'a1', t: 'A', x: 723, y: 337 }, { id: 'b2', t: 'B', x: 608, y: 92 },
-      { id: 'b3', t: 'B', x: 868, y: 147, len: 140 }, { id: 'b4', t: 'B', x: 1072, y: 275, len: 140 }, { id: 'b5', t: 'B', x: 1222, y: 92, len: 88 },
-      { id: 'c1', t: 'C', x: 1369, y: 172 }],
-    items: [{ id: 'i1', kind: 'k1', x: 477, y: 181 }, { id: 'i2', kind: 'k2', x: 1170, y: 354 }],
-    goals: [{ at: [1369, 172], items: ['i1', 'i2'],
-      board: { caption: 'A seed sprouts, a flower blooms, and drops new seeds.', parts: [{ kind: 'k2', at: [0.34, 0.2], slot: true }, { kind: 'k3', at: [0.68, 0.2] }, { kind: 'k1', at: [0.5, 0.8], slot: true }] } }],
-    cams: [[427, 404, 0.9], [822, 227, 0.85], [1095, 224, 0.95], [1097, 199, 0.95]],
-    solution: ['b1', 'wait', 'a1', 'b2', 'wait', 'b3', 'wait', 'b4', 'wait', 'b5', 'wait', 'c1'],
-  },
-  {
-    name: 'Level 4',
-    page: { title: 'Busy Bees', stickers: { k1: '🐝', k2: '🌸', k3: '🍯' } },
-    size: [2160, 600], unit: 1.9, start: [110, 300],
-    blocks: [[40, 300, 200, 400], [300, 500, 340, 200], [800, 400, 300, 300], [1180, 500, 240, 200], [1395, 230, 50, 130], [1840, 260, 260, 400]],
-    pins: [{ id: 'c0', t: 'C', x: 500, y: 500 }, { id: 'a1', t: 'A', x: 600, y: 250 }, { id: 'b2', t: 'B', x: 760, y: 180, len: 200 },
-      { id: 'c2', t: 'C', x: 1000, y: 400 }, { id: 'b3', t: 'B', x: 1230, y: 200, len: 160 }, { id: 'c3', t: 'C', x: 1300, y: 500 },
-      { id: 'a3', t: 'A', x: 1480, y: 330 }, { id: 'a2', t: 'A', x: 1560, y: 150 }, { id: 'b5', t: 'B', x: 1760, y: 130, len: 135 },
-      { id: 'c5', t: 'C', x: 1980, y: 260 }],
-    items: [{ id: 'i1', kind: 'k1', x: 470, y: 470 }, { id: 'i2', kind: 'k2', x: 1361, y: 292 }, { id: 'i3', kind: 'k3', x: 1300, y: 470 }],
-    goals: [
-      { at: [1000, 400], items: ['i1'],
-        board: { caption: 'Bees visit the flowers…', parts: [{ kind: 'k2', at: [0.5, 0.2] }, { kind: 'k1', at: [0.5, 0.8], slot: true }] } },
-      { at: [1980, 260], items: ['i2', 'i3'],
-        board: { caption: '…and flowers give the bees honey!', parts: [{ kind: 'k2', at: [0.34, 0.2], slot: true }, { kind: 'k3', at: [0.68, 0.2], slot: true }, { kind: 'k1', at: [0.5, 0.8] }] } }],
-    cams: [[391, 381, 0.95], [849, 294], [1262, 336, 0.85], [1511, 392], [1738, 248]],
-    solution: ['c0', 'a1', 'b2', 'wait', 'c2', 'b3', 'wait', 'c3', 'a3', 'a2', 'b5', 'wait', 'c5'],
-  },
+// Play order inside each world, by id: meet the new thing, use it, mix it, twist it, test it (see docs/scaling-plan.md).
+function order(levels, ids) {
+  const byId = Object.fromEntries(levels.map((l) => [l.id, l]));
+  const out = ids.map((id) => byId[id] || (() => { throw new Error(`no level "${id}"`); })());
+  for (const l of levels) if (!ids.includes(l.id)) throw new Error(`level "${l.id}" is not in the play order`);
+  return out;
+}
+
+export const WORLDS = [
+  { id: 'meadow', title: 'Meadow', icon: '🌼', levels: order(meadow, ['hello', 'stepdown', 'backforit', 'wings', 'uphigh', 'steps', 'gap', 'hike']) },
+  { id: 'woods', title: 'Woods', icon: '🌲', levels: order(woods, ['rain', 'cliff', 'twotongues', 'hangtight', 'hopoff', 'bonk', 'longbranch', 'deepwoods']) },
+  { id: 'pond', title: 'Pond', icon: '🐸', levels: order(pond, ['swing', 'ropeend', 'swingdash', 'lilypads', 'backforth', 'swingjump', 'relay', 'sunflower']) },
+  { id: 'hive', title: 'Hive', icon: '🐝', levels: order(hive, ['farmpost', 'around', 'breeze', 'landseasky', 'twoways', 'upaway', 'timing', 'highroad', 'longway', 'bees']) },
 ];
+
+// Every level in play order, with its world and its number in the world ("2-3").
+export const LEVELS = WORLDS.flatMap((w, wi) =>
+  w.levels.map((l, i) => ({ ...l, world: wi, num: `${wi + 1}-${i + 1}`, name: `${wi + 1}-${i + 1} ${l.page.title}` })));

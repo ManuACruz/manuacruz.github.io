@@ -1,10 +1,11 @@
-// Level checker: node tools/check.mjs [--runs 20000] [--level 3] [--seed 1]
+// Level checker: node tools/check.mjs [--runs 20000] [--level 2-3] [--seed 1]
 // 1. plays each level's solution, 2. checks the camera framing before every step (tools/framing.mjs), 3. runs random players.
 import { Sim, scaleLevel, playSolution, STEP } from '../src/sim.js';
 import { CamSpots } from '../src/cam.js';
 import { LEVELS } from '../src/levels.js';
 import { DEFAULTS } from '../src/tune.js';
 import { frameLevel } from './framing.mjs';
+import { boardProblems } from '../src/boards.js';
 
 const args = process.argv.slice(2);
 const arg = (k, d) => {
@@ -12,7 +13,7 @@ const arg = (k, d) => {
   return i >= 0 ? Number(args[i + 1]) : d;
 };
 const RUNS = arg('runs', 20000);
-const ONLY = arg('level', 0);
+const ONLY = args.includes('--level') ? args[args.indexOf('--level') + 1] : null; // 2-3, an id, or a list index
 let seed = arg('seed', 1);
 const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 const T = { ...DEFAULTS };
@@ -33,6 +34,11 @@ function checkSolution(L) {
   if (bad.length) failures++;
   for (const s of bad) console.log(`  camera: before ${s.st}${f.big ? ` (spot ${s.spot})` : ''}: ${s.problems.map((p) => `${p.what} short by ${p.short.toFixed(0)} px`).join(', ')}`);
   if (!bad.length) console.log(`  camera: OK${f.big ? ` (${f.moves} moves)` : ''}`);
+  // every goal's album page: a known type, a caption, one slot per sticker the goal takes
+  const pages = L.goals.flatMap((g) => boardProblems(L, g).map((p) => `goal ${g.i + 1}: ${p}`));
+  if (pages.length) failures++;
+  for (const p of pages) console.log('  page: ' + p);
+  if (!pages.length) console.log(`  page: OK (${L.goals.map((g) => g.board.type || 'cycle').join(', ')})`);
   return res;
 }
 
@@ -91,7 +97,7 @@ function randomPlayers(L) {
 }
 
 LEVELS.forEach((raw, i) => {
-  if (ONLY && ONLY !== i + 1) return;
+  if (ONLY && ![raw.num, raw.id, String(i + 1)].includes(ONLY)) return;
   const L = scaleLevel(raw);
   console.log(`${raw.name}  (${L.w.toFixed(0)} x ${L.h.toFixed(0)} world px)`);
   checkSolution(L);
