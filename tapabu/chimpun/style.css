@@ -1,0 +1,100 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #e7c592;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  --s: 90px;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  background:
+    repeating-linear-gradient(92deg, rgba(120, 72, 20, .05) 0 2px, transparent 2px 9px, rgba(120, 72, 20, .035) 9px 10px, transparent 10px 23px),
+    linear-gradient(180deg, #efd2a2, #e3bd85);
+}
+
+#board, #pieces { position: absolute; inset: 0; }
+#pieces { pointer-events: none; }
+#fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Reads the notch / home bar insets from JS. */
+#safe {
+  position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+/* The four mats */
+.zone {
+  position: absolute;
+  border-radius: calc(var(--s) * .3);
+  background: var(--c);
+  box-shadow:
+    inset 0 0 0 calc(var(--s) * .05) rgba(255, 255, 255, .42),
+    0 calc(var(--s) * .05) 0 var(--d);
+  overflow: hidden;
+}
+.zone .icon {
+  position: absolute; left: 50%; top: 50%;
+  opacity: .42;
+  transition: opacity .35s;
+  will-change: transform;
+}
+.zone.on .icon { opacity: .85; }
+.zone .glow { position: absolute; inset: 0; background: #fff; opacity: 0; will-change: opacity; }
+
+/* The shelf the figures rest on */
+.tray {
+  position: absolute;
+  background: linear-gradient(180deg, #c4935a, #b68247);
+  border-top: 4px solid #a57237;
+  box-shadow: inset 0 12px 16px -8px rgba(60, 30, 0, .4);
+}
+.slot {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(70, 35, 0, .16);
+  box-shadow: inset 0 4px 7px rgba(60, 30, 0, .28), 0 2px 0 rgba(255, 255, 255, .16);
+}
+
+/* Figures */
+.fig {
+  position: absolute; left: 0; top: 0;
+  width: var(--s); height: var(--s);
+  will-change: transform;
+}
+.fig svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.fig .m1 { opacity: 0; }
+.fig.sing .m1 { opacity: 1; }
+.fig.sing .m0 { opacity: 0; }
+
+/* Start veil: one tap from a grown-up turns the sound on */
+#start {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  border: 0;
+  background: rgba(70, 40, 10, .38);
+  cursor: pointer;
+  transition: opacity .35s;
+  touch-action: manipulation;
+}
+#start.gone { opacity: 0; pointer-events: none; }
+.playbtn {
+  width: 38vmin; height: 38vmin; max-width: 260px; max-height: 260px;
+  border-radius: 50%;
+  background: #ff8a5c;
+  box-shadow: 0 1.6vmin 0 #d9643a, 0 0 0 2vmin rgba(255, 255, 255, .35);
+  display: grid; place-items: center;
+  animation: pulse 1.3s ease-in-out infinite;
+}
+.playbtn svg { width: 62%; height: 62%; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }

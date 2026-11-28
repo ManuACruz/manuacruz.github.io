@@ -1,0 +1,13 @@
+{
+  "name": "Chimpún",
+  "short_name": "Chimpún",
+  "description": "A music toy for one year olds.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#e7c592",
+  "theme_color": "#e9c896",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
