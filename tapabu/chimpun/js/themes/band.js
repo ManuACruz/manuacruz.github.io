@@ -2,7 +2,7 @@
 // beats with a little swing. Mats: sun (plain), flower (bouncy), cloud (high, slow, with
 // echo), leaf (fast).
 
-import { INK, TONGUE, eye, cheek, line, wrap, icon } from '../art.js?v=4';
+import { INK, TONGUE, eye, cheek, line, wrap, icon } from '../art.js?v=5';
 
 // ---------- figures ----------
 const bear = wrap('bear',

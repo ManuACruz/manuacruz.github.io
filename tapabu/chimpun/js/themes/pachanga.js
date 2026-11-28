@@ -3,7 +3,7 @@
 // with it; the chord changes twice a bar. Mats: palm (son, on the beat), pineapple
 // (cha-cha-chá), shell (bolero, slow, with echo), chili (mambo, fast and full).
 
-import { INK, TONGUE, icon, cut, shape, brush, dab } from '../art.js?v=4';
+import { INK, TONGUE, icon, cut, shape, brush, dab } from '../art.js?v=5';
 
 // ---------- figures ----------
 // Hand-cut, hand-painted, like the band: nothing mirrored, no perfect circles.

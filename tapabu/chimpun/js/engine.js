@@ -13,6 +13,7 @@
 // mats (echo / room per mat), optional voices of its own, and the touch, start and ending sounds.
 
 const LOOK = 0.13; // how far ahead notes are handed to the audio clock
+const MASTER = 0.5; // overall level going into the compressor and limiter
 const MAJ = [0, 2, 4, 7, 9];
 const MIN = [0, 2, 3, 7, 10];
 
@@ -43,16 +44,43 @@ export function createEngine(ctx, theme, opts = {}) {
   const chordAt = (i) => PROG[Math.floor(i / CS) % PROG.length];
   const IDS = theme.figures.map((f) => f.id);
 
+  // Everything sums into master. Phone speakers cannot play deep bass and distort trying, so
+  // it is filtered out first. Then a gentle compressor, a limiter and a soft ceiling keep the
+  // mix away from full scale however many figures play at once.
   const master = ctx.createGain();
-  master.gain.value = 0.78;
+  master.gain.value = MASTER;
+  const lowCut = ctx.createBiquadFilter();
+  lowCut.type = 'highpass'; lowCut.frequency.value = 100; lowCut.Q.value = 0.7;
+  const lowShelf = ctx.createBiquadFilter();
+  lowShelf.type = 'lowshelf'; lowShelf.frequency.value = 220; lowShelf.gain.value = -4;
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -16;
-  comp.knee.value = 14;
-  comp.ratio.value = 5;
-  comp.attack.value = 0.004;
-  comp.release.value = 0.18;
-  master.connect(comp);
-  comp.connect(ctx.destination);
+  comp.threshold.value = -18;
+  comp.knee.value = 12;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.006;
+  comp.release.value = 0.2;
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -8;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.001;
+  limiter.release.value = 0.09;
+  // Soft ceiling: untouched below 0.6, then bends over and never passes 0.83 (-1.6 dB).
+  const ceiling = ctx.createWaveShaper();
+  {
+    const n = 2049, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1, ax = Math.abs(x);
+      curve[i] = Math.sign(x) * (ax <= 0.6 ? ax : 0.6 + 0.25 * Math.tanh((ax - 0.6) / 0.25));
+    }
+    ceiling.curve = curve;
+    ceiling.oversample = '2x';
+  }
+  // The compressors add gain of their own; trim brings the result back under the ceiling's bend.
+  const trim = ctx.createGain();
+  trim.gain.value = 0.8;
+  master.connect(lowCut); lowCut.connect(lowShelf); lowShelf.connect(comp);
+  comp.connect(limiter); limiter.connect(trim); trim.connect(ceiling); ceiling.connect(ctx.destination);
 
   const noiseBuf = ctx.createBuffer(1, sr * 2, sr);
   {

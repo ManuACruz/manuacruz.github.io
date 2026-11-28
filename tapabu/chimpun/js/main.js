@@ -6,7 +6,7 @@
 // Figures can be dragged; a short tap also makes one hop to the next place (a mat, then the
 // next mat, and after all four back to the shelf), so small hands that cannot drag yet can play.
 
-import { createEngine } from './engine.js?v=4';
+import { createEngine } from './engine.js?v=5';
 
 const MIN_SONG_MS = 1500; // a song shorter than this ends without applause
 

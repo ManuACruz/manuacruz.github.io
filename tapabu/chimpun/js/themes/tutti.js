@@ -4,7 +4,7 @@
 // 7 octave), which allows runs and trills. Mats are the variations: laurel (the theme, long
 // notes), fountain (plucked), candle (slow, bowed, with echo), fan (running notes and trills).
 
-import { INK, TONGUE, icon, cut, shape, brush, dab } from '../art.js?v=4';
+import { INK, TONGUE, icon, cut, shape, brush, dab } from '../art.js?v=5';
 
 // ---------- figures ----------
 const mouthOpen = (pts, tongue) => `<g class="m1">${shape(pts, INK)}${shape(tongue, TONGUE)}</g>`;
