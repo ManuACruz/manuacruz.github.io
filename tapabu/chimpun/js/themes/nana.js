@@ -2,7 +2,7 @@
 // beats. Figures sleep with their eyes shut and open them on each note. Mats: house (plain),
 // tree (rocking), mountain (high and slow, with echo), waves (flowing).
 
-import { INK, PINK, eye, cheek, line, sleepy, wrap, icon } from '../art.js?v=2';
+import { INK, PINK, eye, cheek, line, sleepy, wrap, icon } from '../art.js?v=4';
 
 // ---------- figures ----------
 const smile = (x, y, w = 5) => line(`M${x - w} ${y} Q${x} ${y + w * 0.85} ${x + w} ${y}`, 2.4, INK, 'm0');

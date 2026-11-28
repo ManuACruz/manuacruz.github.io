@@ -6,7 +6,7 @@
 // Figures can be dragged; a short tap also makes one hop to the next place (a mat, then the
 // next mat, and after all four back to the shelf), so small hands that cannot drag yet can play.
 
-import { createEngine } from './engine.js?v=2';
+import { createEngine } from './engine.js?v=4';
 
 const MIN_SONG_MS = 1500; // a song shorter than this ends without applause
 
@@ -180,14 +180,16 @@ export function boot(theme) {
     cheerUntil = now + 4400;
     const at = engine.tada();
     engine.applause(at);
-    const star = party.shape === 'star';
+    // What falls: confetti (1), stars (3) or petals (4). Stars and petals drift down slowly.
+    const type = party.shape === 'star' ? 3 : party.shape === 'petal' ? 4 : 1;
+    const slow = type !== 1;
     for (let i = 0; i < party.count; i++) {
       parts.push({
-        type: star ? 3 : 1, delay: 0.3 + Math.random() * (star ? 2.5 : 1.3),
+        type, delay: 0.3 + Math.random() * (slow ? 2.5 : 1.3),
         x: Math.random() * W, y: -20 - Math.random() * 60,
-        vx: (Math.random() - 0.5) * (star ? 30 : 90), vy: H * party.fall * (0.65 + Math.random() * 0.7),
-        rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * (star ? 2 : 12),
-        s: size * (star ? 0.1 + Math.random() * 0.1 : 0.1 + Math.random() * 0.08), life: 9, max: 9,
+        vx: (Math.random() - 0.5) * (slow ? 30 : 90), vy: H * party.fall * (0.65 + Math.random() * 0.7),
+        rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * (type === 3 ? 2 : type === 4 ? 5 : 12),
+        s: size * (slow ? 0.1 + Math.random() * 0.1 : 0.1 + Math.random() * 0.08), life: 9, max: 9,
         color: party.colors[i % party.colors.length], ph: Math.random() * 6.28,
       });
     }
@@ -362,6 +364,15 @@ export function boot(theme) {
         g2.globalAlpha = Math.min(1, q.life * 1.5) * (0.65 + 0.35 * Math.sin(q.ph * 2.3));
         g2.fillStyle = q.color;
         g2.save(); g2.translate(q.x, q.y); g2.rotate(q.rot); drawStar(q.s); g2.restore();
+      } else if (q.type === 4) {
+        q.ph += dt * 2.2;
+        q.x += (q.vx + Math.sin(q.ph) * 45) * dt; q.y += q.vy * dt; q.rot += q.vr * dt * Math.cos(q.ph);
+        const w = q.s * 0.75 * (0.45 + 0.55 * Math.abs(Math.cos(q.ph * 0.8)));
+        g2.globalAlpha = Math.min(1, q.life * 1.5);
+        g2.fillStyle = q.color;
+        g2.save(); g2.translate(q.x, q.y); g2.rotate(q.rot);
+        g2.beginPath(); g2.moveTo(-q.s, 0); g2.quadraticCurveTo(0, -w, q.s, 0); g2.quadraticCurveTo(0, w, -q.s, 0); g2.fill();
+        g2.restore();
       } else {
         g2.globalAlpha = k * 0.7;
         g2.strokeStyle = '#fff';

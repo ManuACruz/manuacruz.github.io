@@ -3,9 +3,11 @@
 // One clock drives every figure, so whatever is on the mats plays in time. The theme says how
 // long a bar is and which chords the song walks through, for ever. A pattern is a string with
 // one character per step. For tuned parts a digit starts a note, '-' holds it and '.' is a
-// rest. A digit is not a pitch but a place in the current chord's five-note scale (0 root,
-// 2 third, 3 fifth, 5 the root an octave up), so every pattern fits every chord and nothing
-// can sound wrong. For percussion parts each letter is a hit the theme names.
+// rest. A digit is not a pitch but a place in the current chord's scale, so every pattern fits
+// every chord and nothing can sound wrong. By default that is a five-note scale (0 root,
+// 2 third, 3 fifth, 5 the root an octave up). A song with a key uses the key's seven notes
+// instead, counted from the chord's root (0 root, 2 third, 4 fifth, 7 the octave), which
+// allows runs and trills. For percussion parts each letter is a hit the theme names.
 //
 // A theme supplies: song (tempo, bar length, chords), parts (one per figure: patterns per mat),
 // mats (echo / room per mat), optional voices of its own, and the touch, start and ending sounds.
@@ -15,9 +17,12 @@ const MAJ = [0, 2, 4, 7, 9];
 const MIN = [0, 2, 3, 7, 10];
 
 export const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
-export const degToMidi = (root, min, deg) => {
-  const o = Math.floor(deg / 5);
-  return root + (min ? MIN : MAJ)[deg - o * 5] + 12 * o;
+const KEY_MAJ = [0, 2, 4, 5, 7, 9, 11];
+const KEY_MIN = [0, 2, 3, 5, 7, 8, 10];
+// scale: semitones above the root, any length.
+export const degToMidi = (root, scale, deg) => {
+  const n = scale.length, o = Math.floor(deg / n);
+  return root + scale[deg - o * n] + 12 * o;
 };
 
 export function createEngine(ctx, theme, opts = {}) {
@@ -28,7 +33,14 @@ export function createEngine(ctx, theme, opts = {}) {
   const STEPS = SPB * (song.beatsPerBar || 4);
   const SD = 60 / song.bpm / SPB; // one step, in seconds
   const SWING = song.swing || 0;  // off-beat steps arrive this fraction of a step late
-  const PROG = song.prog;
+  const CS = song.chordSteps || STEPS; // how long one chord lasts; a bar unless the song says so
+  // Each chord's scale. In a song with a key, the key's notes counted from the chord's root.
+  const keyPcs = song.key ? (song.key.minor ? KEY_MIN : KEY_MAJ).map((x) => (x + song.key.tonic) % 12) : null;
+  const PROG = song.prog.map((c) => ({
+    ...c,
+    scale: c.scale || (keyPcs ? keyPcs.map((pc) => (pc - c.mel + 120) % 12).sort((a, b) => a - b) : c.min ? MIN : MAJ),
+  }));
+  const chordAt = (i) => PROG[Math.floor(i / CS) % PROG.length];
   const IDS = theme.figures.map((f) => f.id);
 
   const master = ctx.createGain();
@@ -281,14 +293,15 @@ export function createEngine(ctx, theme, opts = {}) {
   function playTuned(dest, t, spec, root, ch, deg, dur, v) {
     const base = (root === 'bass' ? ch.bass : ch.mel) + 12 * (spec.oct || 0);
     const fn = V[spec.voice];
-    if (!spec.chord) { fn(dest, t, degToMidi(base, ch.min, deg), dur, v, spec.opt); return; }
-    const midis = spec.chord.map((dg) => degToMidi(base, ch.min, deg + dg));
+    if (!spec.chord) { fn(dest, t, degToMidi(base, ch.scale, deg), dur, v, spec.opt); return; }
+    const midis = spec.chord.map((dg) => degToMidi(base, ch.scale, deg + dg));
     if (fn.poly) fn(dest, t, midis, dur, v, spec.opt);
     else for (const m of midis) fn(dest, t, m, dur, v, spec.opt);
   }
 
   // One step of one figure. Returns how long the figure should look busy, 0 if it rested.
-  function playPart(v, bar, s, t, ch) {
+  function playPart(v, i, t, ch) {
+    const bar = Math.floor(i / STEPS), s = i % STEPS;
     const part = theme.parts[v.id];
     const z = v.zone;
     if (part.hits) {
@@ -310,22 +323,23 @@ export function createEngine(ctx, theme, opts = {}) {
     if (!n && v.entered && b.hold[s]) n = { deg: b.hold[s].deg, len: b.hold[s].step + b.hold[s].len - s };
     if (!n) return 0;
     const dur = n.len * SD * (mat.gate ?? 0.9);
+    // ahead: a note this close before a chord change already plays the coming chord.
+    if (mat.ahead && i % CS >= CS - mat.ahead) ch = chordAt(i + CS);
     playTuned(v.seg, t, mat, part.root, ch, n.deg, dur, vel() * (mat.vel ?? 1));
     return Math.max(dur, SD);
   }
 
   // ---- clock ----
-  let running = false, t0 = 0, stepIdx = 0, timer = 0, curBar = 0;
+  let running = false, t0 = 0, stepIdx = 0, timer = 0, curStep = 0;
   const stepTime = (i) => t0 + i * SD + (i % 2 ? SWING * SD : 0);
 
   function doStep(i, t) {
-    const bar = Math.floor(i / STEPS), s = i % STEPS;
-    curBar = bar;
-    const ch = PROG[bar % PROG.length];
+    curStep = i;
+    const ch = chordAt(i);
     for (const id of IDS) {
       const v = voices[id];
       if (v.zone < 0) continue;
-      const len = playPart(v, bar, s, t, ch);
+      const len = playPart(v, i, t, ch);
       v.entered = false;
       if (len) onNote(id, t, len);
     }
@@ -344,7 +358,7 @@ export function createEngine(ctx, theme, opts = {}) {
     running = true;
     t0 = ctx.currentTime + 0.06;
     stepIdx = 0;
-    curBar = 0;
+    curStep = 0;
     clearInterval(timer);
     timer = setInterval(tick, 25);
     tick();
@@ -396,7 +410,7 @@ export function createEngine(ctx, theme, opts = {}) {
       }
       return;
     }
-    const ch = running ? PROG[curBar % PROG.length] : PROG[0];
+    const ch = running ? chordAt(curStep) : PROG[0];
     for (const [deg, at, dur] of h.notes) playTuned(d, t + at, h, part.root, ch, deg, dur, h.vel ?? 0.9);
   }
 

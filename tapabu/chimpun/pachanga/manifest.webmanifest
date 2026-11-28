@@ -1,0 +1,18 @@
+{
+  "name": "Pachanga",
+  "short_name": "Pachanga",
+  "description": "A salsa toy for one year olds.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#1d949c",
+  "theme_color": "#1d949c",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
