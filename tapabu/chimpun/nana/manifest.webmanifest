@@ -1,0 +1,13 @@
+{
+  "name": "Nana",
+  "short_name": "Nana",
+  "description": "A lullaby toy for one year olds.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "background_color": "#262452",
+  "theme_color": "#2c2a62",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
